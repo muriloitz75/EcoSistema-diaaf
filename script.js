@@ -2779,6 +2779,7 @@ function App() {
     const [unlockPassword, setUnlockPassword] = useState('');
     const [unlockError, setUnlockError] = useState('');
     const [isUnlocking, setIsUnlocking] = useState(false);
+    const [wakeProgress, setWakeProgress] = useState(0); // 0 a 100
     const inactivityTimeoutRef = useRef(null);
 
     // Estado para usuários pendentes (apenas admin)
@@ -3079,22 +3080,31 @@ function App() {
             // Se o erro vier do Soft Loading (TypeError fetch / 503), ele já lançou o evento global.
             // Acionamos um retry automático para re-submeter a senha validada quando o backend acordar.
             if (error.message.includes('fetch') || error.message.includes('despertando') || (error.message && error.message.includes('sleeping'))) {
-                setUnlockError('Servidor acordando, autenticando automaticamente...');
+                setUnlockError('');
+                setWakeProgress(1); // Inicia progresso
                 
                 let retryCount = 0;
+                const maxRetries = 15;
                 const retryLogin = async () => {
                     retryCount++;
+                    // Atualiza a barra reservando 100% para o sucesso
+                    setWakeProgress(Math.min(95, Math.floor((retryCount / maxRetries) * 100)));
+                    
                     try {
                         await ApiService.login(currentUser.username, unlockPassword);
-                        setIsLockedOut(false);
-                        localStorage.setItem('isLockedOut', 'false');
-                        setUnlockPassword('');
-                        setIsUnlocking(false);
-                        setUnlockError('');
+                        setWakeProgress(100);
+                        setTimeout(() => {
+                            setIsLockedOut(false);
+                            localStorage.setItem('isLockedOut', 'false');
+                            setUnlockPassword('');
+                            setIsUnlocking(false);
+                            setWakeProgress(0);
+                        }, 600); // tempo para o smooth da animacao ate 100%
                     } catch (retryError) {
-                        if (retryCount < 15) { // 15 tentativas * 2s = 30s
+                        if (retryCount < maxRetries) { // maxRetries * 2s = 30s
                             setTimeout(retryLogin, 2000);
                         } else {
+                            setWakeProgress(0);
                             setUnlockError('Servidor não respondeu a tempo. Atualize a página e tente novamente.');
                             setIsUnlocking(false);
                         }
@@ -3415,7 +3425,26 @@ function App() {
                                 />
                             </div>
 
-                            {unlockError && (
+                            {wakeProgress > 0 ? (
+                                <div className="my-3 animate-fadeIn">
+                                    <div className="flex justify-between items-center mb-1.5 px-1">
+                                        <span className={`text-xs font-bold uppercase tracking-wide ${darkMode ? 'text-blue-400' : 'text-blue-600'}`}>
+                                            Despertando Servidor
+                                        </span>
+                                        <span className={`text-xs font-bold ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                                            {wakeProgress}%
+                                        </span>
+                                    </div>
+                                    <div className={`h-2.5 w-full rounded-full overflow-hidden shadow-inner ${darkMode ? 'bg-gray-700/60' : 'bg-gray-100'}`}>
+                                        <div 
+                                            className="h-full rounded-full bg-gradient-to-r from-blue-500 to-indigo-500 transition-all duration-[2000ms] ease-out relative"
+                                            style={{ width: `${wakeProgress}%` }}
+                                        >
+                                            <div className="absolute inset-0 bg-white/20 animate-pulse mix-blend-overlay"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            ) : unlockError && (
                                 <div className={`text-sm font-medium p-3 rounded-xl text-center animate-pulse ${darkMode ? 'bg-red-900/30 text-red-400 border border-red-800' : 'bg-red-50 text-red-600 border border-red-200'}`}>
                                     {unlockError}
                                 </div>
