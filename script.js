@@ -2042,7 +2042,7 @@ const BANNER_STATIC = {
         menu: 'home',
         description: 'Gere pareceres fiscais automaticamente',
         icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z',
-        href: 'https://script.google.com/macros/s/AKfycbzL4QGjBggc_7QeV-RPrE25n6bYDkgUOQ36v1dmjyMJN_34YgYYsTuyg-SVe3tBA903Lg/exec',
+        href: 'https://opinion-factory-production.up.railway.app/',
         light: 'from-emerald-50 to-teal-50 border-emerald-400 hover:border-emerald-500',
         dark: 'from-emerald-900/50 to-teal-900/50 border-emerald-500/30 hover:border-emerald-500',
         iconLight: 'bg-white text-emerald-600 shadow-md',
@@ -3454,9 +3454,9 @@ function App() {
                                 <button
                                     type="submit"
                                     disabled={isUnlocking}
-                                    className={`w-full py-3 rounded-xl font-bold text-white transition-all duration-200 shadow-md transform hover:-translate-y-0.5 ${darkMode ? 'bg-blue-600 hover:bg-blue-500' : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:opacity-90'} disabled:opacity-50`}
+                                    className={`w-full py-3 rounded-xl font-bold text-white transition-all duration-200 shadow-md transform hover:-translate-y-0.5 ${darkMode ? 'bg-blue-600 hover:bg-blue-500' : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:opacity-90'} disabled:opacity-50 ${isUnlocking ? 'hidden' : 'block'}`}
                                 >
-                                    {isUnlocking ? 'Verificando...' : 'Desbloquear'}
+                                    Desbloquear
                                 </button>
                                 <button
                                     type="button"
