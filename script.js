@@ -3082,14 +3082,14 @@ function App() {
             if (error.message.includes('fetch') || error.message.includes('despertando') || (error.message && error.message.includes('sleeping'))) {
                 setUnlockError('');
                 setWakeProgress(1); // Inicia progresso
-                
+
                 let retryCount = 0;
                 const maxRetries = 15;
                 const retryLogin = async () => {
                     retryCount++;
                     // Atualiza a barra reservando 100% para o sucesso
                     setWakeProgress(Math.min(95, Math.floor((retryCount / maxRetries) * 100)));
-                    
+
                     try {
                         await ApiService.login(currentUser.username, unlockPassword);
                         setWakeProgress(100);
@@ -3357,7 +3357,7 @@ function App() {
                 {/* Background decorative blobs */}
                 <div className={`absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full mix-blend-multiply filter blur-[80px] opacity-70 animate-blob ${darkMode ? 'bg-blue-600/20' : 'bg-blue-300'}`}></div>
                 <div className={`absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full mix-blend-multiply filter blur-[80px] opacity-70 animate-blob animation-delay-2000 ${darkMode ? 'bg-purple-600/20' : 'bg-purple-300'}`}></div>
-                
+
                 <div className="flex flex-col items-center justify-center p-8 z-10">
                     <div className="relative mb-8 mt-[-10vh]">
                         {/* Outer rotating ring */}
@@ -3436,7 +3436,7 @@ function App() {
                                         </span>
                                     </div>
                                     <div className={`h-2.5 w-full rounded-full overflow-hidden shadow-inner ${darkMode ? 'bg-gray-700/60' : 'bg-gray-100'}`}>
-                                        <div 
+                                        <div
                                             className="h-full rounded-full bg-gradient-to-r from-blue-500 to-indigo-500 transition-all duration-[2000ms] ease-out relative"
                                             style={{ width: `${wakeProgress}%` }}
                                         >
@@ -3657,7 +3657,7 @@ function App() {
                                         <div className="glass-card-header flex items-center gap-2 p-1 rounded-2xl shadow-xl">
                                             <div className="relative flex items-center gap-3">
                                                 <a
-                                                    href="https://chat.nextplan.tec.br/login"
+                                                    href="https://app.bbgov360.com.br/atendimento?id=8340618"
                                                     target="_blank"
                                                     rel="noopener noreferrer"
                                                     className="relative group p-0.5 rounded-2xl transition-all duration-300 hover:scale-110 active:scale-95 ring-2 ring-blue-500/20 bg-blue-500/5 shadow-inner"
