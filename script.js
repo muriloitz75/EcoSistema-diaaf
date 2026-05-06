@@ -177,10 +177,14 @@ class ApiService {
             return null;
         } catch (error) {
             console.error('Falha na validação da sessão:', error);
-            localStorage.removeItem('authToken');
-            localStorage.removeItem('currentUser');
-            localStorage.removeItem('isAuthenticated');
-            return null;
+            // Só limpa o cache se o erro for explicitamente de autenticação (401/403)
+            // Se for erro de rede (fetch) ou servidor indisponível (503), mantemos os dados para tentar novamente
+            if (error.message && (error.message.includes('401') || error.message.includes('403') || error.message.includes('não autorizado') || error.message.includes('inválido'))) {
+                localStorage.removeItem('authToken');
+                localStorage.removeItem('currentUser');
+                localStorage.removeItem('isAuthenticated');
+            }
+            throw error; // Repassa o erro para o App.js tratar o "Despertar" se necessário
         }
     }
 
@@ -738,7 +742,7 @@ function UserProfilePage({ user, onLogout, onCredentialsChanged, darkMode }) {
 }
 
 // Componente de Login e Cadastro
-function LoginForm({ onLogin, darkMode }) {
+function LoginForm({ onLogin, darkMode, wakeProgress, setWakeProgress }) {
     const [isRegistering, setIsRegistering] = useState(false);
     const [isForgotPassword, setIsForgotPassword] = useState(false);
     const [forgotPasswordMsg, setForgotPasswordMsg] = useState({ type: '', text: '' });
@@ -838,8 +842,40 @@ function LoginForm({ onLogin, darkMode }) {
             localStorage.setItem('isAuthenticated', 'true');
             onLogin(user);
         } catch (error) {
-            console.error('Erro no login:', error);
-            setError(error.message || 'Usuário ou senha inválidos.');
+            // Lógica de Despertar do Servidor no Login Inicial
+            if (error.message.includes('fetch') || error.message.includes('despertando') || (error.message && error.message.includes('sleeping'))) {
+                setError('');
+                setWakeProgress(1); // Inicia progresso
+
+                let retryCount = 0;
+                const maxRetries = 15;
+                const retryLogin = async () => {
+                    retryCount++;
+                    setWakeProgress(Math.min(95, Math.floor((retryCount / maxRetries) * 100)));
+
+                    try {
+                        const user = await ApiService.login(username, password);
+                        setWakeProgress(100);
+                        setTimeout(() => {
+                            localStorage.setItem('isAuthenticated', 'true');
+                            onLogin(user);
+                            setWakeProgress(0);
+                        }, 600);
+                    } catch (retryError) {
+                        if (retryCount < maxRetries) {
+                            setTimeout(retryLogin, 2000);
+                        } else {
+                            setWakeProgress(0);
+                            setError('Servidor não respondeu a tempo. Tente novamente em instantes.');
+                            setIsLoading(false);
+                        }
+                    }
+                };
+                setTimeout(retryLogin, 1000);
+            } else {
+                console.error('Erro no login:', error);
+                setError(error.message || 'Usuário ou senha inválidos.');
+            }
         }
     };
 
@@ -1051,20 +1087,31 @@ function LoginForm({ onLogin, darkMode }) {
                             </div>
                         )}
 
-                        <div className="pt-2">
                             <button
                                 type="submit"
-                                disabled={isLoading}
-                                className={`btn-modern w-full py-3.5 text-white text-base shadow-lg transition-all active:scale-95 disabled:opacity-50 ${isRegistering ? 'bg-gradient-to-r from-emerald-500 to-teal-600 shadow-emerald-500/25' : 'gradient-primary shadow-blue-500/25'}`}
+                                disabled={isLoading || (wakeProgress > 0 && wakeProgress < 100)}
+                                className={`btn-modern w-full py-3.5 text-white text-base shadow-lg transition-all active:scale-95 disabled:opacity-50 relative overflow-hidden ${isRegistering ? 'bg-gradient-to-r from-emerald-500 to-teal-600 shadow-emerald-500/25' : 'gradient-primary shadow-blue-500/25'}`}
                             >
-                                {isLoading ? (
+                                {/* Barra de progresso discreta dentro do botão */}
+                                {wakeProgress > 0 && (
+                                    <div 
+                                        className="absolute bottom-0 left-0 h-1 bg-white/40 transition-all duration-500"
+                                        style={{ width: `${wakeProgress}%` }}
+                                    ></div>
+                                )}
+
+                                {wakeProgress > 0 ? (
+                                    <div className="flex items-center justify-center gap-2">
+                                        <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
+                                        <span className="text-sm font-bold uppercase tracking-wider">Despertando {wakeProgress}%</span>
+                                    </div>
+                                ) : isLoading ? (
                                     <div className="flex items-center justify-center gap-2">
                                         <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
                                         <span>Processando&hellip;</span>
                                     </div>
                                 ) : (isRegistering ? 'Criar Minha Conta' : 'Acessar Sistema')}
                             </button>
-                        </div>
 
                         <div className="flex flex-col gap-4 text-center pt-6 border-t border-gray-100 dark:border-gray-700/50">
                             {!isRegistering && (
@@ -2740,12 +2787,50 @@ function App() {
     useEffect(() => {
         const validate = async () => {
             if (isAuthenticated) {
-                const validUser = await ApiService.validateSession();
-                if (validUser) {
-                    setCurrentUser(validUser);
-                } else {
-                    setIsAuthenticated(false);
-                    setCurrentUser(null);
+                try {
+                    const validUser = await ApiService.validateSession();
+                    if (validUser) {
+                        setCurrentUser(validUser);
+                    } else {
+                        setIsAuthenticated(false);
+                        setCurrentUser(null);
+                    }
+                } catch (error) {
+                    // Se o erro for de servidor dormindo (Railway), iniciamos o despertar
+                    if (error.message.includes('fetch') || error.message.includes('despertando') || error.message.includes('sleeping')) {
+                        console.log('Servidor dormindo detectado na validação. Iniciando despertar...');
+                        setWakeProgress(1);
+                        
+                        let retryCount = 0;
+                        const maxRetries = 15;
+                        const retryValidate = async () => {
+                            retryCount++;
+                            setWakeProgress(Math.min(95, Math.floor((retryCount / maxRetries) * 100)));
+                            
+                            try {
+                                const validUser = await ApiService.validateSession();
+                                setWakeProgress(100);
+                                setTimeout(() => {
+                                    if (validUser) setCurrentUser(validUser);
+                                    setWakeProgress(0);
+                                    setIsSessionValidating(false);
+                                }, 600);
+                            } catch (retryError) {
+                                if (retryCount < maxRetries) {
+                                    setTimeout(retryValidate, 2000);
+                                } else {
+                                    setWakeProgress(0);
+                                    setIsSessionValidating(false);
+                                    setIsAuthenticated(false); // Desiste e manda pro login
+                                }
+                            }
+                        };
+                        setTimeout(retryValidate, 2000);
+                        return; // O setIsSessionValidating(false) será chamado no final do retry
+                    } else {
+                        setIsAuthenticated(false);
+                        setCurrentUser(null);
+                    }
                 }
             }
             setIsSessionValidating(false);
@@ -2997,8 +3082,10 @@ function App() {
     const handleLogin = (user) => {
         setIsAuthenticated(true);
         setCurrentUser(user);
+        setIsLockedOut(false); // Reseta o bloqueio fantasma
         localStorage.setItem('isAuthenticated', 'true');
         localStorage.setItem('currentUser', JSON.stringify(user));
+        localStorage.setItem('isLockedOut', 'false'); // Limpa do armazenamento
 
         // Registrar acesso nas estatísticas
         updateStatistics('access', {
@@ -3387,7 +3474,14 @@ function App() {
 
     // Renderização condicional baseada na autenticação
     if (!isAuthenticated) {
-        return <LoginForm onLogin={handleLogin} darkMode={darkMode} />;
+        return (
+            <LoginForm 
+                onLogin={handleLogin} 
+                darkMode={darkMode} 
+                wakeProgress={wakeProgress}
+                setWakeProgress={setWakeProgress}
+            />
+        );
     }
 
     return (
