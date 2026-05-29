@@ -2110,18 +2110,6 @@ const BANNER_STATIC = {
         iconDark: 'bg-emerald-500/20 text-emerald-400',
         hoverBg: { light: 'bg-emerald-600', dark: 'bg-white' }
     },
-    'incidencia': {
-        label: 'Incidência do ISS',
-        menu: 'home',
-        description: 'LC 116/2003 – Art. 3º',
-        icon: 'M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0zM15 11a3 3 0 11-6 0 3 3 0 016 0z',
-        href: 'https://script.google.com/macros/s/AKfycbwFWD5zweoKS-WccLZJkH4KCVQSKcLR-guuITNhmOYg/dev',
-        light: 'from-orange-50 to-amber-50 border-orange-400 hover:border-orange-500',
-        dark: 'from-orange-900/50 to-amber-900/50 border-orange-500/30 hover:border-orange-500',
-        iconLight: 'bg-white text-orange-600 shadow-md',
-        iconDark: 'bg-orange-500/20 text-orange-400',
-        hoverBg: { light: 'bg-orange-600', dark: 'bg-white' }
-    },
     'processos': {
         label: 'Análise de Processos',
         menu: 'home',
@@ -2939,7 +2927,6 @@ function App() {
         const defaultBanners = [
             { id: 'banner-iss-cnae', key: 'iss-cnae', label: 'Consulta ISS / CNAE', enabled: true },
             { id: 'banner-pareceres', key: 'pareceres', label: 'Gerador de Pareceres', enabled: true },
-            { id: 'banner-incidencia', key: 'incidencia', label: 'Incidência do ISS', enabled: true },
             { id: 'banner-processos', key: 'processos', label: 'Análise de Processos', enabled: true },
             { id: 'banner-entes', key: 'entes', label: 'Entes Federados', enabled: true },
             { id: 'banner-empresa-facil', key: 'empresa-facil', label: 'Empresa Fácil', enabled: true },
@@ -3292,6 +3279,85 @@ function App() {
         if (!code) return '';
         // Remove espaços, hífens e barras, mantém apenas números
         return code.toString().replace(/[\s\-\/]/g, '').trim();
+    };
+
+    // Função para obter o local de incidência do ISS de acordo com o Artigo 3º da LC 116/2003 (atualizado)
+    const getISSIncidenceLocation = (listLc) => {
+        if (!listLc) return "Estabelecimento Prestador (Regra Geral)";
+
+        // Normaliza o código (ex: "07.02" -> "7.02")
+        const cleanLc = listLc.toString().trim().replace(/^0+/, '');
+        const parts = cleanLc.split('.');
+        const item = parseInt(parts[0], 10);
+        const subitem = parts[1] ? parseInt(parts[1], 10) : null;
+        const formatted = `${item}.${parts[1] || '00'}`;
+
+        // Exceções do Artigo 3º - ISS devido no local do serviço / domicílio do tomador
+        if (formatted === "3.04") {
+            return "Domicílio do Tomador (Local dos Bens)";
+        }
+        if (formatted === "3.05") {
+            return "Domicílio do Tomador (Local da Instalação)";
+        }
+        if (formatted === "7.02" || formatted === "7.19") {
+            return "Domicílio do Tomador (Local da Obra)";
+        }
+        if (formatted === "7.04" || formatted === "7.05") {
+            return "Domicílio do Tomador (Local do Serviço)";
+        }
+        if (formatted === "7.09" || formatted === "7.10") {
+            return "Domicílio do Tomador (Local do Imóvel)";
+        }
+        if (formatted === "7.11") {
+            return "Domicílio do Tomador (Local da Lavra)";
+        }
+        if (formatted === "7.12") {
+            return "Domicílio do Tomador (Local da Execução)";
+        }
+        if (["7.14", "7.15", "7.17"].includes(formatted)) {
+            return "Domicílio do Tomador (Local do Serviço)";
+        }
+        if (formatted === "11.01") {
+            return "Domicílio do Tomador";
+        }
+        if (formatted === "11.02") {
+            return "Domicílio do Tomador (Local dos Bens/Pessoas)";
+        }
+        if (formatted === "11.04") {
+            return "Domicílio do Tomador (Local do Depósito)";
+        }
+        if (formatted === "11.05") {
+            return "Domicílio do Tomador";
+        }
+        if (item === 12 && formatted !== "12.13") {
+            return "Domicílio do Tomador (Local do Show/Evento)";
+        }
+        if (["4.22", "4.23"].includes(formatted)) {
+            return "Domicílio do Tomador";
+        }
+        if (formatted === "5.09") {
+            return "Domicílio do Tomador";
+        }
+        if (formatted === "15.01") {
+            return "Domicílio do Tomador";
+        }
+        if (formatted === "15.09") {
+            return "Domicílio do Tomador";
+        }
+        if (formatted === "16.01") {
+            return "Domicílio do Tomador (Local do Trajeto)";
+        }
+        if (formatted === "17.05") {
+            return "Domicílio do Tomador (Establ. do Tomador)";
+        }
+        if (formatted === "17.10") {
+            return "Domicílio do Tomador (Local do Evento)";
+        }
+        if (["20.01", "20.02", "20.03"].includes(formatted)) {
+            return "Domicílio do Tomador (Local do Terminal)";
+        }
+
+        return "Estabelecimento Prestador (Regra Geral)";
     };
 
     // Função de busca assertiva específica para cada tipo de campo
@@ -5232,6 +5298,10 @@ function App() {
                                                                 } border-b`}>
                                                                 Alíquota ISS
                                                             </th>
+                                                            <th className={`px-4 py-3 text-center text-xs font-medium uppercase tracking-wider ${darkMode ? 'text-gray-300 border-gray-600' : 'text-gray-500 border-gray-200'
+                                                                } border-b`}>
+                                                                Local de Incidência (Art. 3º LC 116)
+                                                            </th>
                                                         </tr>
                                                     </thead>
                                                     <tbody className={`divide-y ${darkMode ? 'divide-gray-600' : 'divide-gray-200'}`}>
@@ -5276,6 +5346,22 @@ function App() {
                                                                         }`}>
                                                                         {item["Alíquota"]}
                                                                     </span>
+                                                                </td>
+                                                                <td className={`px-4 py-4 whitespace-nowrap text-sm text-center ${darkMode ? 'text-gray-300' : 'text-gray-900'
+                                                                    }`}>
+                                                                    {(() => {
+                                                                        const loc = getISSIncidenceLocation(item["LIST LC"]);
+                                                                        const isPrestador = loc.includes("Prestador");
+                                                                        return (
+                                                                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${
+                                                                                isPrestador
+                                                                                    ? (darkMode ? 'bg-blue-900/30 text-blue-300 border-blue-800' : 'bg-blue-50 text-blue-800 border-blue-200')
+                                                                                    : (darkMode ? 'bg-emerald-900/40 text-emerald-300 border-emerald-800' : 'bg-emerald-50 text-emerald-800 border-emerald-200')
+                                                                            }`}>
+                                                                                {loc}
+                                                                            </span>
+                                                                        );
+                                                                    })()}
                                                                 </td>
                                                             </tr>
                                                         ))}

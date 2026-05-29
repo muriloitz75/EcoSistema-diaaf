@@ -136,7 +136,6 @@ const connectDB = async () => {
                 const defaultBanners = [
                     { id: 'iss-cnae', key: 'iss-cnae', label: 'Consulta ISS / CNAE' },
                     { id: 'pareceres', key: 'pareceres', label: 'Gerador de Pareceres' },
-                    { id: 'incidencia', key: 'incidencia', label: 'Incidência do ISS' },
                     { id: 'processos', key: 'processos', label: 'Análise de Processos' },
                     { id: 'nfse-nacional', key: 'nfse-nacional', label: 'NFS-e Nacional' },
                     { id: 'diario-oficial', key: 'diario-oficial', label: 'Diário Oficial' },
@@ -221,7 +220,6 @@ const connectDB = async () => {
             const defaultBanners = [
                 { id: 'iss-cnae', key: 'iss-cnae', label: 'Consulta ISS / CNAE' },
                 { id: 'pareceres', key: 'pareceres', label: 'Gerador de Pareceres' },
-                { id: 'incidencia', key: 'incidencia', label: 'Incidência do ISS' },
                 { id: 'processos', key: 'processos', label: 'Análise de Processos' },
                 { id: 'nfse-nacional', key: 'nfse-nacional', label: 'NFS-e Nacional' },
                 { id: 'diario-oficial', key: 'diario-oficial', label: 'Diário Oficial' },
@@ -254,6 +252,15 @@ const connectDB = async () => {
 
     // Executar a conexão com retry
     await tryConnect();
+
+    // Remove o banner 'incidencia' obsoleto
+    try {
+        await db.run('DELETE FROM "BannerConfig" WHERE key = $1', ['incidencia']);
+        await db.run('DELETE FROM "UserBannerConfig" WHERE "bannerId" = $1', ['incidencia']);
+        console.log("[DB] Banner de incidência obsoleto removido.");
+    } catch (e) {
+        console.error("[DB] Erro ao remover banner obsoleto:", e.message);
+    }
 
     const bcrypt = require('bcrypt');
     const adminCheck = await db.query('SELECT * FROM "User" WHERE username = $1', ['admin']);
