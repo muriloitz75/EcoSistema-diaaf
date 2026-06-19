@@ -119,7 +119,11 @@
                     })
                     .then(function (code) {
                         try {
-                            var transformed = Babel.transform(code, { presets: ['react'] }).code;
+                            var transformed = Babel.transform(code, {
+                                presets: [
+                                    ['react', { runtime: 'classic' }]
+                                ]
+                            }).code;
                             var fn = new Function('React', 'ReactDOM', 'return (function(){ ' + transformed + ' })();');
                             fn(React, ReactDOM);
                         } catch (e) {
