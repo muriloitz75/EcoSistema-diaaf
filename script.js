@@ -1087,31 +1087,31 @@ function LoginForm({ onLogin, darkMode, wakeProgress, setWakeProgress }) {
                             </div>
                         )}
 
-                            <button
-                                type="submit"
-                                disabled={isLoading || (wakeProgress > 0 && wakeProgress < 100)}
-                                className={`btn-modern w-full py-3.5 text-white text-base shadow-lg transition-all active:scale-95 disabled:opacity-50 relative overflow-hidden ${isRegistering ? 'bg-gradient-to-r from-emerald-500 to-teal-600 shadow-emerald-500/25' : 'gradient-primary shadow-blue-500/25'}`}
-                            >
-                                {/* Barra de progresso discreta dentro do botão */}
-                                {wakeProgress > 0 && (
-                                    <div 
-                                        className="absolute bottom-0 left-0 h-1 bg-white/40 transition-all duration-500"
-                                        style={{ width: `${wakeProgress}%` }}
-                                    ></div>
-                                )}
+                        <button
+                            type="submit"
+                            disabled={isLoading || (wakeProgress > 0 && wakeProgress < 100)}
+                            className={`btn-modern w-full py-3.5 text-white text-base shadow-lg transition-all active:scale-95 disabled:opacity-50 relative overflow-hidden ${isRegistering ? 'bg-gradient-to-r from-emerald-500 to-teal-600 shadow-emerald-500/25' : 'gradient-primary shadow-blue-500/25'}`}
+                        >
+                            {/* Barra de progresso discreta dentro do botão */}
+                            {wakeProgress > 0 && (
+                                <div
+                                    className="absolute bottom-0 left-0 h-1 bg-white/40 transition-all duration-500"
+                                    style={{ width: `${wakeProgress}%` }}
+                                ></div>
+                            )}
 
-                                {wakeProgress > 0 ? (
-                                    <div className="flex items-center justify-center gap-2">
-                                        <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
-                                        <span className="text-sm font-bold uppercase tracking-wider">Despertando {wakeProgress}%</span>
-                                    </div>
-                                ) : isLoading ? (
-                                    <div className="flex items-center justify-center gap-2">
-                                        <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
-                                        <span>Processando&hellip;</span>
-                                    </div>
-                                ) : (isRegistering ? 'Criar Minha Conta' : 'Acessar Sistema')}
-                            </button>
+                            {wakeProgress > 0 ? (
+                                <div className="flex items-center justify-center gap-2">
+                                    <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
+                                    <span className="text-sm font-bold uppercase tracking-wider">Despertando {wakeProgress}%</span>
+                                </div>
+                            ) : isLoading ? (
+                                <div className="flex items-center justify-center gap-2">
+                                    <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
+                                    <span>Processando&hellip;</span>
+                                </div>
+                            ) : (isRegistering ? 'Criar Minha Conta' : 'Acessar Sistema')}
+                        </button>
 
                         <div className="flex flex-col gap-4 text-center pt-6 border-t border-gray-100 dark:border-gray-700/50">
                             {!isRegistering && (
@@ -2254,7 +2254,7 @@ const BANNER_STATIC = {
         label: 'Justificativas de Ponto',
         menu: 'outros',
         description: 'Acesso via INTRANET sefazgo',
-        href: 'http://192.168.201.198/menu',
+        href: 'https://protocolo.imperatriz.ma.gov.br/menu',
         icon: 'M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z',
         light: 'from-amber-50 to-orange-50 border-amber-400 hover:border-amber-500',
         dark: 'from-amber-900/40 to-orange-900/40 border-amber-500/30 hover:border-amber-400',
@@ -2802,13 +2802,13 @@ function App() {
                     if (error.message.includes('fetch') || error.message.includes('despertando') || error.message.includes('sleeping')) {
                         console.log('Servidor dormindo detectado na validação. Iniciando despertar...');
                         setWakeProgress(1);
-                        
+
                         let retryCount = 0;
                         const maxRetries = 15;
                         const retryValidate = async () => {
                             retryCount++;
                             setWakeProgress(Math.min(95, Math.floor((retryCount / maxRetries) * 100)));
-                            
+
                             try {
                                 const validUser = await ApiService.validateSession();
                                 setWakeProgress(100);
@@ -3555,9 +3555,9 @@ function App() {
     // Renderização condicional baseada na autenticação
     if (!isAuthenticated) {
         return (
-            <LoginForm 
-                onLogin={handleLogin} 
-                darkMode={darkMode} 
+            <LoginForm
+                onLogin={handleLogin}
+                darkMode={darkMode}
                 wakeProgress={wakeProgress}
                 setWakeProgress={setWakeProgress}
             />
@@ -5353,11 +5353,10 @@ function App() {
                                                                         const loc = getISSIncidenceLocation(item["LIST LC"]);
                                                                         const isPrestador = loc.includes("Prestador");
                                                                         return (
-                                                                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${
-                                                                                isPrestador
+                                                                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${isPrestador
                                                                                     ? (darkMode ? 'bg-blue-900/30 text-blue-300 border-blue-800' : 'bg-blue-50 text-blue-800 border-blue-200')
                                                                                     : (darkMode ? 'bg-emerald-900/40 text-emerald-300 border-emerald-800' : 'bg-emerald-50 text-emerald-800 border-emerald-200')
-                                                                            }`}>
+                                                                                }`}>
                                                                                 {loc}
                                                                             </span>
                                                                         );
