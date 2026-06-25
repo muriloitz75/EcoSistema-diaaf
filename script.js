@@ -272,6 +272,19 @@ class ApiService {
         });
     }
 
+    static async getLockscreenTimeout() {
+        return this.request('/settings/lockscreen-timeout', {
+            method: 'GET'
+        });
+    }
+
+    static async updateLockscreenTimeout(timeout) {
+        return this.request('/settings/lockscreen-timeout', {
+            method: 'POST',
+            body: JSON.stringify({ timeout })
+        });
+    }
+
     // --- Métodos de Banners ---
     static async getBanners() {
         const token = localStorage.getItem('authToken');
@@ -2868,6 +2881,9 @@ function App() {
     const [isUnlocking, setIsUnlocking] = useState(false);
     const [wakeProgress, setWakeProgress] = useState(0); // 0 a 100
     const inactivityTimeoutRef = useRef(null);
+    const [lockscreenTimeout, setLockscreenTimeout] = useState('5');
+    const [tempTimeoutVal, setTempTimeoutVal] = useState('5');
+    const [isSavingTimeout, setIsSavingTimeout] = useState(false);
 
     // Estado para usuários pendentes (apenas admin)
     const [pendingUsers, setPendingUsers] = useState([]);
@@ -3116,7 +3132,7 @@ function App() {
         });
     };
 
-    // ----- LOGICA DE INATIVIDADE (5 MINUTOS) -----
+    // ----- LOGICA DE INATIVIDADE DINAMICA -----
     const resetInactivityTimer = () => {
         if (!isAuthenticated || isLockedOut) return;
 
@@ -3124,11 +3140,19 @@ function App() {
             clearTimeout(inactivityTimeoutRef.current);
         }
 
-        // 300000 ms = 5 minutos
+        if (lockscreenTimeout === 'free') {
+            return;
+        }
+
+        const minutes = parseInt(lockscreenTimeout, 10);
+        if (isNaN(minutes) || minutes <= 0) return;
+
+        const timeoutMs = minutes * 60 * 1000;
+
         inactivityTimeoutRef.current = setTimeout(() => {
             setIsLockedOut(true);
             localStorage.setItem('isLockedOut', 'true');
-        }, 300000);
+        }, timeoutMs);
     };
 
     useEffect(() => {
@@ -3149,7 +3173,46 @@ function App() {
                 events.forEach(event => window.removeEventListener(event, resetInactivityTimer));
             };
         }
-    }, [isAuthenticated, isLockedOut]);
+    }, [isAuthenticated, isLockedOut, lockscreenTimeout]);
+
+    // Carregar configuração do lockscreen ao autenticar
+    useEffect(() => {
+        if (isAuthenticated) {
+            ApiService.getLockscreenTimeout()
+                .then(res => {
+                    if (res && res.timeout) {
+                        setLockscreenTimeout(res.timeout);
+                        setTempTimeoutVal(res.timeout);
+                    }
+                })
+                .catch(err => {
+                    console.error("Erro ao carregar tempo de bloqueio:", err);
+                });
+        }
+    }, [isAuthenticated]);
+
+    const handleSaveTimeout = async (value) => {
+        let finalVal = value;
+        if (value === 'custom') {
+            finalVal = '15'; // Valor padrão inicial
+        }
+        if (finalVal !== 'free' && (isNaN(parseInt(finalVal)) || parseInt(finalVal) <= 0)) {
+            alert('Por favor, insira um valor válido em minutos.');
+            return;
+        }
+        
+        try {
+            setIsSavingTimeout(true);
+            await ApiService.updateLockscreenTimeout(finalVal);
+            setLockscreenTimeout(finalVal);
+            setTempTimeoutVal(finalVal);
+            alert('Configuração de tempo de bloqueio atualizada com sucesso!');
+        } catch (e) {
+            alert('Erro ao salvar configuração: ' + e.message);
+        } finally {
+            setIsSavingTimeout(false);
+        }
+    };
 
     const handleUnlockSubmit = async (e) => {
         if (e) e.preventDefault();
@@ -4854,6 +4917,96 @@ function App() {
                                                     </div>
                                                 );
                                             })()}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Configurações de Segurança */}
+                                <div className={`p-6 rounded-2xl ${darkMode ? 'bg-gray-800/80 border border-gray-700/50' : 'bg-white border border-gray-100'} shadow-sm`}>
+                                    <div className="flex items-center gap-3 mb-4">
+                                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${darkMode ? 'bg-indigo-500/20 text-indigo-400' : 'bg-indigo-50 text-indigo-600'}`}>
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+                                        </div>
+                                        <h3 className={`font-bold text-sm ${darkMode ? 'text-white' : 'text-gray-900'}`}>Configurações de Segurança</h3>
+                                    </div>
+                                    
+                                    <div className="space-y-4">
+                                        <div>
+                                            <p className={`text-xs font-semibold mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>Tempo de Tolerância para Bloqueio por Inatividade</p>
+                                            <p className={`text-xs mb-4 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Defina o tempo de inatividade permitido antes que a sessão do usuário seja temporariamente bloqueada por segurança.</p>
+                                            
+                                            <div className="flex flex-wrap gap-2 mb-4">
+                                                {[
+                                                    { label: '5 Minutos', value: '5' },
+                                                    { label: '20 Minutos', value: '20' },
+                                                    { label: '30 Minutos', value: '30' },
+                                                    { label: '50 Minutos', value: '50' },
+                                                    { label: 'Livre (Sem Bloqueio)', value: 'free' },
+                                                    { label: 'Personalizado', value: 'custom' }
+                                                ].map(opt => {
+                                                    const isSelected = opt.value === 'custom' 
+                                                        ? (lockscreenTimeout !== '5' && lockscreenTimeout !== '20' && lockscreenTimeout !== '30' && lockscreenTimeout !== '50' && lockscreenTimeout !== 'free')
+                                                        : lockscreenTimeout === opt.value;
+                                                    
+                                                    return (
+                                                        <button
+                                                            key={opt.value}
+                                                            type="button"
+                                                            onClick={() => {
+                                                                if (opt.value === 'custom') {
+                                                                    setTempTimeoutVal(
+                                                                        (lockscreenTimeout !== '5' && lockscreenTimeout !== '20' && lockscreenTimeout !== '30' && lockscreenTimeout !== '50' && lockscreenTimeout !== 'free')
+                                                                            ? lockscreenTimeout
+                                                                            : '15'
+                                                                    );
+                                                                } else {
+                                                                    setTempTimeoutVal(opt.value);
+                                                                    handleSaveTimeout(opt.value);
+                                                                }
+                                                            }}
+                                                            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all border ${
+                                                                isSelected 
+                                                                    ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm'
+                                                                    : (darkMode ? 'bg-gray-700/50 border-gray-600/50 text-gray-300 hover:bg-gray-700' : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100')
+                                                            }`}
+                                                        >
+                                                            {opt.label}
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+
+                                            {/* Input para valor personalizado */}
+                                            {((lockscreenTimeout !== '5' && lockscreenTimeout !== '20' && lockscreenTimeout !== '30' && lockscreenTimeout !== '50' && lockscreenTimeout !== 'free') || (tempTimeoutVal !== '5' && tempTimeoutVal !== '20' && tempTimeoutVal !== '30' && tempTimeoutVal !== '50' && tempTimeoutVal !== 'free')) && (
+                                                <div className="flex items-center gap-3 animate-fadeInUp mt-2">
+                                                    <div className="relative max-w-[140px]">
+                                                        <input
+                                                            type="number"
+                                                            min="1"
+                                                            max="1440"
+                                                            value={isNaN(parseInt(tempTimeoutVal)) ? '' : parseInt(tempTimeoutVal)}
+                                                            onChange={(e) => setTempTimeoutVal(e.target.value)}
+                                                            placeholder="Minutos"
+                                                            className={`w-full text-xs font-bold rounded-xl pl-3 pr-10 py-2 border outline-none transition-colors ${
+                                                                darkMode 
+                                                                    ? 'bg-gray-800 border-gray-700 text-white focus:border-indigo-500' 
+                                                                    : 'bg-white border-gray-200 text-gray-900 focus:border-indigo-600'
+                                                            }`}
+                                                        />
+                                                        <span className={`absolute right-3 top-2 text-xs font-semibold ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>min</span>
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleSaveTimeout(tempTimeoutVal)}
+                                                        disabled={isSavingTimeout}
+                                                        className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                                                            darkMode ? 'bg-indigo-600 text-white hover:bg-indigo-500' : 'bg-indigo-600 text-white hover:bg-indigo-700'
+                                                        } ${isSavingTimeout ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                                    >
+                                                        {isSavingTimeout ? 'Salvando...' : 'Salvar'}
+                                                    </button>
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                 </div>

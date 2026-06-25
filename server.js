@@ -94,6 +94,12 @@ const connectDB = async () => {
                         enabled BOOLEAN DEFAULT true, "orderIndex" INTEGER DEFAULT 0,
                         "updatedAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP, UNIQUE("userId", "bannerId")
                     );
+                    CREATE TABLE IF NOT EXISTS "SystemConfig" (
+                        id TEXT PRIMARY KEY,
+                        key TEXT UNIQUE NOT NULL,
+                        value TEXT NOT NULL,
+                        "updatedAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    );
                 `);
 
                 const colMigrations = [
@@ -167,6 +173,11 @@ const connectDB = async () => {
                     );
                 }
 
+                await pool.query(
+                    `INSERT INTO "SystemConfig" (id, key, value) VALUES ($1, $2, $3) ON CONFLICT (key) DO NOTHING`,
+                    [uuidv4(), 'lockscreen_timeout', '5']
+                );
+
                 return true;
 
             } catch (err) {
@@ -208,6 +219,7 @@ const connectDB = async () => {
             await db.run(`CREATE TABLE IF NOT EXISTS AuditLog (id TEXT PRIMARY KEY, userId TEXT, action TEXT NOT NULL, timestamp TEXT DEFAULT CURRENT_TIMESTAMP, ipAddress TEXT, userAgent TEXT, success INTEGER DEFAULT 1, details TEXT);`);
             await db.run(`CREATE TABLE IF NOT EXISTS BannerConfig (id TEXT PRIMARY KEY, key TEXT UNIQUE NOT NULL, label TEXT NOT NULL, enabled INTEGER DEFAULT 1, orderIndex INTEGER DEFAULT 0, isFrozen INTEGER DEFAULT 0, updatedAt TEXT DEFAULT CURRENT_TIMESTAMP);`);
             await db.run(`CREATE TABLE IF NOT EXISTS UserBannerConfig (id TEXT PRIMARY KEY, userId TEXT NOT NULL, bannerId TEXT NOT NULL, enabled INTEGER DEFAULT 1, orderIndex INTEGER DEFAULT 0, updatedAt TEXT DEFAULT CURRENT_TIMESTAMP, UNIQUE(userId, bannerId));`);
+            await db.run(`CREATE TABLE IF NOT EXISTS SystemConfig (id TEXT PRIMARY KEY, key TEXT UNIQUE NOT NULL, value TEXT NOT NULL, updatedAt TEXT DEFAULT CURRENT_TIMESTAMP);`);
 
             try {
                 const columns = await db.query("PRAGMA table_info(BannerConfig)");
@@ -247,6 +259,7 @@ const connectDB = async () => {
                 const b = defaultBanners[i];
                 await db.run(`INSERT OR IGNORE INTO BannerConfig (id, key, label, enabled, orderIndex) VALUES ($1, $2, $3, $4, $5)`, [b.id, b.key, b.label, 1, i]);
             }
+            await db.run(`INSERT OR IGNORE INTO SystemConfig (id, key, value) VALUES ($1, $2, $3)`, [uuidv4(), 'lockscreen_timeout', '5']);
         }
     };
 
@@ -1105,6 +1118,60 @@ app.delete('/api/admin/users/:userId/banners', authenticateToken, requireAdmin, 
     } catch (error) {
         console.error('Erro ao resetar banners do usuário:', error);
         res.status(500).json({ error: 'Erro interno no servidor' });
+    }
+});
+
+// ================= ROTAS DE CONFIGURAÇÃO DO SISTEMA =================
+
+// Buscar tempo limite de inatividade da tela de bloqueio (Acessível por todos autenticados)
+app.get('/api/settings/lockscreen-timeout', authenticateToken, requireDB, async (req, res) => {
+    try {
+        const settings = await db.query('SELECT value FROM "SystemConfig" WHERE key = $1', ['lockscreen_timeout']);
+        const timeout = settings.length > 0 ? settings[0].value : '5';
+        res.json({ timeout });
+    } catch (error) {
+        console.error("Erro ao buscar tempo de bloqueio:", error);
+        res.status(500).json({ error: "Erro interno no servidor" });
+    }
+});
+
+// Atualizar tempo limite de inatividade da tela de bloqueio (Apenas Admin)
+app.post('/api/settings/lockscreen-timeout', authenticateToken, requireAdmin, requireDB, async (req, res) => {
+    try {
+        const { timeout } = req.body;
+        if (!timeout) {
+            return res.status(400).json({ error: "O parâmetro timeout é obrigatório." });
+        }
+        
+        if (timeout !== 'free' && isNaN(parseInt(timeout))) {
+            return res.status(400).json({ error: "O parâmetro timeout deve ser um número ou 'free'." });
+        }
+
+        const existing = await db.query('SELECT id FROM "SystemConfig" WHERE key = $1', ['lockscreen_timeout']);
+        if (existing.length > 0) {
+            if (db.isPg) {
+                await db.run('UPDATE "SystemConfig" SET value = $1, "updatedAt" = CURRENT_TIMESTAMP WHERE key = $2', [timeout, 'lockscreen_timeout']);
+            } else {
+                await db.run('UPDATE SystemConfig SET value = $1, updatedAt = CURRENT_TIMESTAMP WHERE key = $2', [timeout, 'lockscreen_timeout']);
+            }
+        } else {
+            if (db.isPg) {
+                await db.run('INSERT INTO "SystemConfig" (id, key, value) VALUES ($1, $2, $3)', [uuidv4(), 'lockscreen_timeout', timeout]);
+            } else {
+                await db.run('INSERT INTO SystemConfig (id, key, value) VALUES ($1, $2, $3)', [uuidv4(), 'lockscreen_timeout', timeout]);
+            }
+        }
+
+        // Registrar no log de auditoria
+        await db.run(
+            `INSERT INTO "AuditLog" (id, "userId", action, details) VALUES ($1, $2, $3, $4${db.isPg ? '::jsonb' : ''})`,
+            [uuidv4(), req.user.id, 'admin_updated_lockscreen_timeout', JSON.stringify({ timeout })]
+        );
+
+        res.json({ message: "Configuração atualizada com sucesso.", timeout });
+    } catch (error) {
+        console.error("Erro ao atualizar tempo de bloqueio:", error);
+        res.status(500).json({ error: "Erro interno no servidor" });
     }
 });
 
