@@ -2154,7 +2154,7 @@ const BANNER_STATIC = {
         description: 'Publicações do Diário Oficial de Imperatriz',
         imageIcon: 'image/brasao.png',
         imageClass: 'w-full h-full object-cover rounded-full',
-        href: 'https://legisdata.up.railway.app/',
+        href: 'https://diariofacil-itz.up.railway.app/',
         light: 'from-slate-50 to-gray-50 border-slate-400 hover:border-slate-500',
         dark: 'from-slate-900/50 to-gray-900/50 border-slate-500/30 hover:border-slate-500',
         iconLight: 'bg-white text-slate-600 shadow-md',
