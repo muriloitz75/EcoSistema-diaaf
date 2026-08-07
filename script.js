@@ -2135,6 +2135,18 @@ const BANNER_STATIC = {
         iconDark: 'bg-violet-500/20 text-violet-400',
         hoverBg: { light: 'bg-violet-600', dark: 'bg-white' }
     },
+    'painel-distribuicao': {
+        label: 'Painel de Distribuição',
+        menu: 'home',
+        description: 'Acesse o Painel de Distribuição de Processos',
+        icon: 'M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z',
+        href: 'https://planilha-magica.up.railway.app/',
+        light: 'from-amber-50 to-orange-50 border-amber-400 hover:border-amber-500',
+        dark: 'from-amber-900/50 to-orange-900/50 border-amber-500/30 hover:border-amber-500',
+        iconLight: 'bg-white text-amber-600 shadow-md',
+        iconDark: 'bg-amber-500/20 text-amber-400',
+        hoverBg: { light: 'bg-amber-600', dark: 'bg-white' }
+    },
     'nfse-nacional': {
         label: 'Gestão da NFS-e',
         menu: 'home',
@@ -2944,6 +2956,7 @@ function App() {
             { id: 'banner-iss-cnae', key: 'iss-cnae', label: 'Consulta ISS / CNAE', enabled: true },
             { id: 'banner-pareceres', key: 'pareceres', label: 'Gerador de Pareceres', enabled: true },
             { id: 'banner-processos', key: 'processos', label: 'Análise de Processos', enabled: true },
+            { id: 'banner-painel-distribuicao', key: 'painel-distribuicao', label: 'Painel de Distribuição', enabled: true },
             { id: 'banner-entes', key: 'entes', label: 'Entes Federados', enabled: true },
             { id: 'banner-empresa-facil', key: 'empresa-facil', label: 'Empresa Fácil', enabled: true },
             { id: 'banner-biblioteca', key: 'biblioteca', label: 'Biblioteca', enabled: true },
