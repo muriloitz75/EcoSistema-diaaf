@@ -2206,7 +2206,7 @@ const BANNER_STATIC = {
         menu: 'home',
         description: 'Painel gerencial de indicadores tributários',
         icon: 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z',
-        href: 'https://lookerstudio.google.com/u/0/reporting/c62bd011-53f8-4195-8770-cd7e617aa0ac/page/RT8lD',
+        href: 'https://arrec-itz.up.railway.app/',
         light: 'from-green-50 to-lime-50 border-green-200 hover:border-green-400',
         dark: 'from-green-900/50 to-lime-900/50 border-green-500/30 hover:border-green-500',
         iconLight: 'bg-white text-green-600 shadow-md',
