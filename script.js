@@ -1959,121 +1959,84 @@ function Sidebar({ darkMode, currentView, setCurrentView, currentUser, onLogout,
         return currentView === id;
     };
 
+    const toneMain = sideTone('main', darkMode);
+    const toneAdmin = sideTone('admin', darkMode);
+
+    const renderItem = (item, tone) => (
+        <button
+            key={item.id}
+            onClick={() => handleNavigate(item.view)}
+            className={`hud-nav-item ${isActive(item.id) ? 'is-active' : ''}`}
+            style={{ '--tone': tone }}
+        >
+            <span className="hud-nav-icon">{item.icon}</span>
+            {isExpanded && <span className="hud-nav-text animate-fadeInLeft">{item.label}</span>}
+            {!isExpanded && <span className="hud-tip">{item.label}</span>}
+        </button>
+    );
+
     return (
         <div
-            className={`sidebar-container flex-shrink-0 transition-all duration-300 ease-in-out ${isExpanded ? 'w-64' : 'w-20'} 
-                ${darkMode ? 'bg-gray-900 border-r border-gray-800' : 'bg-white border-r border-gray-200'} 
-                flex flex-col h-full shadow-lg ${sidebarMobileOpen ? 'open' : ''}`}
+            className={`sidebar-container hud hud-side ${darkMode ? 'is-dark' : ''} flex-shrink-0 transition-all duration-300 ease-in-out ${isExpanded ? 'w-64' : 'w-20'} ${sidebarMobileOpen ? 'open' : ''}`}
             onMouseEnter={() => setIsExpanded(true)}
             onMouseLeave={() => setIsExpanded(false)}
         >
             {/* Logo/Header */}
-            <div className={`p-4 border-b ${darkMode ? 'border-gray-800' : 'border-gray-200'}`}>
+            <div className="hud-side-head">
                 <div className="flex items-center gap-3">
-                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0
-                        ${darkMode ? 'bg-white shadow-[0_0_15px_rgba(59,130,246,0.5)]' : 'bg-white shadow-md'} 
-                        overflow-hidden p-1.5 border ${darkMode ? 'border-blue-500' : 'border-gray-100'}`}>
-                        <img src="image/ecossistema3.png" alt="DIAAF Logo" className="w-full h-full object-contain" />
+                    <div className="hud-side-mark">
+                        <img src="image/ecossistema3.png" alt="DIAAF Logo" />
                     </div>
                     {isExpanded && (
                         <div className="overflow-hidden animate-fadeInLeft">
-                            <h1 className={`font-bold text-lg leading-tight ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                                Ecossistema DIAAF
-                            </h1>
-                            <p className={`text-[10px] uppercase tracking-tighter font-semibold ${darkMode ? 'text-blue-400' : 'text-blue-600'}`}>
-                                Auditoria e Assuntos Fiscais
-                            </p>
+                            <h1 className="hud-side-title">Painel DIAAF</h1>
+                            <p className="hud-side-sub">Auditoria e Assuntos Fiscais</p>
                         </div>
                     )}
                 </div>
             </div>
 
             {/* Menu de Navegação */}
-            <nav className="flex-1 py-4 overflow-y-auto custom-scrollbar">
-                <div className="px-3 space-y-1">
-                    {/* Separador Principal */}
-                    {isExpanded && (
-                        <p className={`px-3 text-xs font-semibold uppercase tracking-wider mb-2 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>
-                            Menu Principal
-                        </p>
-                    )}
+            <nav className="hud-nav flex-1 overflow-y-auto custom-scrollbar">
+                {isExpanded && <p className="hud-nav-label">Menu Principal</p>}
 
-                    {/* Itens do Menu Principal */}
-                    {menuItems.map((item) => (
-                        <button
-                            key={item.id}
-                            onClick={() => handleNavigate(item.view)}
-                            className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-200 group
-                                ${isActive(item.id)
-                                    ? `${darkMode ? 'bg-blue-600/20 text-blue-400' : 'bg-blue-50 text-blue-600'} shadow-sm`
-                                    : `${darkMode ? 'text-gray-400 hover:bg-gray-800 hover:text-white' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'}`
-                                }`}
-                            title={!isExpanded ? item.label : ''}
-                        >
-                            <div className={`flex-shrink-0 ${isActive(item.id) ? 'scale-110' : 'group-hover:scale-110'} transition-transform`}>
-                                {item.icon}
-                            </div>
-                            {isExpanded && (
-                                <span className="font-medium truncate animate-fadeInLeft">{item.label}</span>
-                            )}
-                            {isActive(item.id) && isExpanded && (
-                                <div className={`ml-auto w-2 h-2 rounded-full ${darkMode ? 'bg-blue-400' : 'bg-blue-600'} animate-pulse`}></div>
-                            )}
-                        </button>
-                    ))}
+                {menuItems.map(item => renderItem(item, toneMain))}
 
-                    {/* Seção Administrativa (apenas para admin) */}
-                    {currentUser?.role === 'admin' && (
-                        <>
-                            {isExpanded && (
-                                <p className={`px-3 text-xs font-semibold uppercase tracking-wider mt-6 mb-2 ${darkMode ? 'text-red-400' : 'text-red-500'}`}>
-                                    Administração
-                                </p>
-                            )}
-
-                            {/* Separador visual */}
-                            <div className={`my-2 border-t ${darkMode ? 'border-gray-800' : 'border-gray-200'}`}></div>
-
-                            {adminItems.map((item) => (
-                                <button
-                                    key={item.id}
-                                    onClick={() => handleNavigate(item.view)}
-                                    className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-200 group
-                                        ${isActive(item.id)
-                                            ? `${darkMode ? 'bg-red-600/20 text-red-400' : 'bg-red-50 text-red-600'} shadow-sm`
-                                            : `${darkMode ? 'text-gray-400 hover:bg-gray-800 hover:text-red-400' : 'text-gray-600 hover:bg-red-50 hover:text-red-600'}`
-                                        }`}
-                                    title={!isExpanded ? item.label : ''}
-                                >
-                                    <div className={`flex-shrink-0 ${isActive(item.id) ? 'scale-110' : 'group-hover:scale-110'} transition-transform`}>
-                                        {item.icon}
-                                    </div>
-                                    {isExpanded && (
-                                        <span className="font-medium truncate animate-fadeInLeft">{item.label}</span>
-                                    )}
-                                    {isActive(item.id) && isExpanded && (
-                                        <div className={`ml-auto w-2 h-2 rounded-full ${darkMode ? 'bg-red-400' : 'bg-red-600'} animate-pulse`}></div>
-                                    )}
-                                </button>
-                            ))}
-                        </>
-                    )}
-                </div>
+                {/* Seção Administrativa (apenas para admin) */}
+                {currentUser?.role === 'admin' && (
+                    <>
+                        <div className="hud-nav-div"></div>
+                        {isExpanded && (
+                            <p className="hud-nav-label hud-nav-label--admin" style={{ '--tone': toneAdmin }}>
+                                Administração
+                            </p>
+                        )}
+                        {adminItems.map(item => renderItem(item, toneAdmin))}
+                    </>
+                )}
             </nav>
 
-            {/* Informações do Usuário no Rodapé */}
-            <div className={`p-4 border-t ${darkMode ? 'border-gray-800' : 'border-gray-200'}`}>
-                <div className={`flex items-center gap-3 p-2 rounded-xl ${darkMode ? 'bg-gray-800' : 'bg-gray-50'}`}>
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0
-                        ${currentUser?.role === 'admin' ? 'bg-red-500' : 'bg-blue-500'} text-white font-bold shadow-md`}>
-                        {currentUser?.name?.charAt(0).toUpperCase() || 'U'}
+            {/* Informações do Usuário no Rodapé — mesmo avatar do cabeçalho */}
+            <div className="hud-side-foot">
+                <div className="hud-panel gap-3 p-2">
+                    <div className="hud-avatar">
+                        <img
+                            src={avatarFor(currentUser)}
+                            alt=""
+                            onError={(e) => {
+                                e.target.style.display = 'none';
+                                e.target.nextSibling.style.display = 'flex';
+                            }}
+                        />
+                        <span className="absolute inset-0 items-center justify-center text-white font-bold text-xs tracking-widest" style={{ display: 'none' }}>
+                            {iniciaisDe(currentUser)}
+                        </span>
+                        <span className="hud-status"></span>
                     </div>
                     {isExpanded && (
                         <div className="overflow-hidden flex-1 min-w-0">
-                            <p className={`font-semibold text-sm truncate ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                                {currentUser?.name || 'Usuário'}
-                            </p>
-                            <p className={`text-xs truncate ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                            <p className="hud-name truncate">{currentUser?.name || 'Usuário'}</p>
+                            <p className="hud-greet truncate">
                                 {currentUser?.role === 'admin' ? 'Administrador' : 'Usuário'}
                             </p>
                         </div>
@@ -2081,12 +2044,16 @@ function Sidebar({ darkMode, currentView, setCurrentView, currentUser, onLogout,
                     {isExpanded && (
                         <button
                             onClick={onLogout}
-                            className={`p-2 rounded-lg transition-all duration-200 ${darkMode ? 'hover:bg-gray-700 text-gray-400 hover:text-red-400' : 'hover:bg-gray-200 text-gray-500 hover:text-red-500'}`}
+                            className="hud-nav-item"
+                            style={{ '--tone': toneAdmin, width: 'auto', padding: '0.45rem' }}
                             title="Sair"
+                            aria-label="Sair"
                         >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                            </svg>
+                            <span className="hud-nav-icon">
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                                </svg>
+                            </span>
                         </button>
                     )}
                 </div>
@@ -2217,6 +2184,28 @@ const HEADER_TONES = {
 };
 
 const headerTone = (key, darkMode) => HEADER_TONES[key][darkMode ? 'dark' : 'light'];
+
+// Tons da navegação lateral. Rótulo de menu é texto pequeno (4,5:1), então o
+// texto do item ativo é o tom misturado ao título — o tom puro sobre o próprio
+// tint fica em ~3,8 e reprova.
+const SIDE_TONES = {
+    main: { light: '#2563eb', dark: '#60a5fa' },
+    admin: { light: '#dc2626', dark: '#f87171' }
+};
+
+const sideTone = (key, darkMode) => SIDE_TONES[key][darkMode ? 'dark' : 'light'];
+
+// Fonte única do avatar: o cabeçalho e o rodapé da sidebar mostravam o mesmo
+// usuário com desenhos diferentes (foto em squircle vs. inicial em círculo).
+const avatarFor = (user) => {
+    const primeiro = (user?.name?.split(' ')[0] || user?.username || '').toLowerCase();
+    const femininos = ['maria', 'ana', 'julia', 'juliana', 'fernanda', 'patricia', 'aline', 'bruna', 'camila', 'jessica', 'amanda', 'leticia', 'beatriz', 'vanessa', 'mariana', 'gabriela', 'larissa', 'daniela', 'carla', 'renata'];
+    const feminino = femininos.includes(primeiro) || primeiro.endsWith('a') || primeiro.endsWith('e');
+    return feminino ? 'image/mulher.png' : 'image/homem.png';
+};
+
+const iniciaisDe = (user) =>
+    user?.name?.substring(0, 2).toUpperCase() || user?.username?.substring(0, 2).toUpperCase() || 'AD';
 
 // Config estática dos banners (UI, cores, links)
 const BANNER_STATIC = {
@@ -4005,25 +3994,16 @@ function App() {
 
                                                 <div className="hud-panel gap-3 pl-2.5 pr-4 py-2.5">
                                                     <div className="hud-avatar">
-                                                        {(() => {
-                                                            const firstName = (currentUser.name?.split(' ')[0] || currentUser.username || '').toLowerCase();
-                                                            const femaleNames = ['maria', 'ana', 'julia', 'juliana', 'fernanda', 'patricia', 'aline', 'bruna', 'camila', 'jessica', 'amanda', 'leticia', 'beatriz', 'vanessa', 'mariana', 'gabriela', 'larissa', 'daniela', 'carla', 'renata'];
-                                                            const isFemale = femaleNames.includes(firstName) || firstName.endsWith('a') || firstName.endsWith('e');
-                                                            const avatarSrc = isFemale ? 'image/mulher.png' : 'image/homem.png';
-
-                                                            return (
-                                                                <img
-                                                                    src={avatarSrc}
-                                                                    alt="Avatar"
-                                                                    onError={(e) => {
-                                                                        e.target.style.display = 'none';
-                                                                        e.target.nextSibling.style.display = 'flex';
-                                                                    }}
-                                                                />
-                                                            );
-                                                        })()}
+                                                        <img
+                                                            src={avatarFor(currentUser)}
+                                                            alt=""
+                                                            onError={(e) => {
+                                                                e.target.style.display = 'none';
+                                                                e.target.nextSibling.style.display = 'flex';
+                                                            }}
+                                                        />
                                                         <span className="absolute inset-0 items-center justify-center text-white font-bold text-xs tracking-widest" style={{ display: 'none' }}>
-                                                            {currentUser?.name?.substring(0, 2).toUpperCase() || currentUser?.username.substring(0, 2).toUpperCase() || 'AD'}
+                                                            {iniciaisDe(currentUser)}
                                                         </span>
                                                         <span className="hud-status"></span>
                                                     </div>

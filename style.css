@@ -2011,6 +2011,8 @@ button.mosaic-chip:active {
 
 .hud {
     --hud-surface: rgba(255, 255, 255, 0.72);
+    /* Painel grande (sidebar) pede mais opacidade que os flutuantes do topo. */
+    --hud-veil: rgba(255, 255, 255, 0.86);
     --hud-solid: #f1f5f9;
     --hud-stroke: rgba(15, 23, 42, 0.1);
     --hud-title: #0f172a;
@@ -2019,6 +2021,7 @@ button.mosaic-chip:active {
 
 .hud.is-dark {
     --hud-surface: rgba(26, 34, 49, 0.72);
+    --hud-veil: rgba(19, 27, 40, 0.88);
     --hud-solid: #131a27;
     --hud-stroke: rgba(255, 255, 255, 0.1);
     --hud-title: #f8fafc;
@@ -2173,6 +2176,207 @@ button.hud-panel:hover {
 .hud-btn:focus-visible .hud-tip {
     opacity: 1;
     transform: translateY(0);
+}
+
+/* ============================================================
+   NAVEGAÇÃO LATERAL — mesma gramática do HUD
+   Raio 0,9rem (igual ao .hud-btn), superfície de vidro, curva com overshoot.
+   A cor dos estados vem de --tone, não de utilitários soltos: o item ativo usa
+   o tom misturado ao título (55%) sobre tint de 14% — 7,51:1 no pior dos quatro
+   combos (principal/admin × claro/escuro). O padrão anterior, tom PURO sobre o
+   próprio tint, dava 4,41 no admin claro, abaixo do mínimo de 4,5.
+   ============================================================ */
+
+.hud-side {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    border-right: 1px solid var(--hud-stroke);
+    background: var(--hud-veil);
+    -webkit-backdrop-filter: blur(18px);
+    backdrop-filter: blur(18px);
+    box-shadow: 8px 0 32px -24px rgba(15, 23, 42, 0.7);
+}
+
+.hud-side-head,
+.hud-side-foot {
+    padding: 0.9rem;
+    flex-shrink: 0;
+}
+
+.hud-side-head {
+    border-bottom: 1px solid var(--hud-stroke);
+}
+
+.hud-side-foot {
+    border-top: 1px solid var(--hud-stroke);
+}
+
+.hud-side-mark {
+    width: 2.75rem;
+    height: 2.75rem;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.35rem;
+    border-radius: 0.9rem;
+    background: var(--hud-surface);
+    border: 1px solid var(--hud-stroke);
+}
+
+.hud-side-mark img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.hud-side-title {
+    font-size: 0.95rem;
+    font-weight: 800;
+    line-height: 1.1;
+    letter-spacing: -0.015em;
+    color: var(--hud-title);
+}
+
+.hud-side-sub {
+    margin-top: 0.2rem;
+    font-size: 0.6rem;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--hud-muted);
+}
+
+.hud-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    padding: 0.75rem 0.6rem;
+}
+
+.hud-nav-label {
+    padding: 0 0.6rem;
+    margin-bottom: 0.3rem;
+    font-size: 0.6rem;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--hud-muted);
+}
+
+.hud-nav-label--admin {
+    color: color-mix(in srgb, var(--tone, #dc2626) 55%, var(--hud-title));
+}
+
+.hud-nav-div {
+    height: 1px;
+    margin: 0.7rem 0.35rem;
+    background: var(--hud-stroke);
+}
+
+.hud-nav-item {
+    position: relative;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    padding: 0.62rem 0.7rem;
+    border-radius: 0.9rem;
+    border: 1px solid transparent;
+    background: transparent;
+    font: inherit;
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-align: left;
+    color: var(--hud-muted);
+    cursor: pointer;
+    transition:
+        background-color 0.25s ease,
+        color 0.25s ease,
+        border-color 0.25s ease,
+        transform 0.3s cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+
+.hud-nav-item:hover {
+    color: var(--hud-title);
+    background-color: color-mix(in srgb, var(--tone, #2563eb) 9%, transparent);
+    transform: translateX(2px);
+}
+
+.hud-nav-item:focus-visible {
+    outline: 2px solid var(--tone, #2563eb);
+    outline-offset: 2px;
+}
+
+.hud-nav-item.is-active {
+    color: color-mix(in srgb, var(--tone, #2563eb) 55%, var(--hud-title));
+    background-color: color-mix(in srgb, var(--tone, #2563eb) 14%, transparent);
+    border-color: color-mix(in srgb, var(--tone, #2563eb) 30%, transparent);
+}
+
+/* Barra do item ativo. Substitui o ponto pulsante, que só era renderizado com
+   a sidebar expandida — ou seja, sumia no estado colapsado, o mais frequente. */
+.hud-nav-item.is-active::before {
+    content: '';
+    position: absolute;
+    left: -0.6rem;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 3px;
+    height: 1.1rem;
+    border-radius: 0 3px 3px 0;
+    background: var(--tone, #2563eb);
+}
+
+.hud-nav-icon {
+    flex-shrink: 0;
+    display: flex;
+    transition: transform 0.3s cubic-bezier(0.34, 1.45, 0.64, 1);
+}
+
+.hud-nav-item:hover .hud-nav-icon {
+    transform: scale(1.1);
+}
+
+.hud-nav-item.is-active .hud-nav-icon {
+    color: var(--tone, #2563eb);
+}
+
+.hud-nav-text {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Dica lateral quando a sidebar está colapsada. */
+.hud-nav-item .hud-tip {
+    top: 50%;
+    right: auto;
+    left: calc(100% + 0.55rem);
+    transform: translate(-4px, -50%);
+}
+
+.hud-nav-item:hover .hud-tip,
+.hud-nav-item:focus-visible .hud-tip {
+    opacity: 1;
+    transform: translate(0, -50%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+    .hud-nav-item,
+    .hud-nav-icon {
+        transition-duration: 0.01ms;
+    }
+
+    .hud-nav-item:hover {
+        transform: none;
+    }
+
+    .hud-nav-item:hover .hud-nav-icon {
+        transform: none;
+    }
 }
 
 /* --- Avatar --- */
