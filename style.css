@@ -1413,3 +1413,965 @@
 .dark .sidebar-container::-webkit-scrollbar-thumb:hover {
     background: rgba(75, 85, 99, 0.7);
 }
+
+/* ============================================================
+   MOSAICO BENTO — Home / Central de Serviços
+
+   Um único token por card, --accent (setado no JSX a partir de MOSAIC_ACCENTS),
+   deriva TODA a cor: banho da superfície, chip do ícone, halo, borda, sombra,
+   chips e seta. A cor é viva mas continua sendo sistema — cada card é a mesma
+   fórmula aplicada a um matiz diferente, não uma decoração avulsa.
+   ============================================================ */
+
+/* --- Grade --- */
+.mosaic-grid {
+    display: grid;
+    grid-template-columns: repeat(1, minmax(0, 1fr));
+    grid-auto-rows: minmax(9rem, auto);
+    gap: 0.7rem;
+}
+
+@media (min-width: 480px) {
+    .mosaic-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.75rem;
+    }
+}
+
+@media (min-width: 768px) {
+    .mosaic-grid {
+        grid-template-columns: repeat(6, minmax(0, 1fr));
+        grid-auto-rows: minmax(9.75rem, auto);
+        gap: 0.9rem;
+    }
+}
+
+@media (min-width: 1024px) {
+    .mosaic-grid {
+        grid-template-columns: repeat(12, minmax(0, 1fr));
+        grid-auto-rows: minmax(10.25rem, auto);
+        gap: 1rem;
+    }
+}
+
+@media (min-width: 1536px) {
+    .mosaic-grid {
+        grid-auto-rows: minmax(11rem, auto);
+        gap: 1.15rem;
+    }
+}
+
+/* Empacotamento denso fecha os buracos deixados por banners desativados.
+   Desligado para admin, onde a ordem visual precisa espelhar a ordem do DOM
+   (drag-and-drop de reordenação). */
+.mosaic-grid.is-dense {
+    grid-auto-flow: row dense;
+}
+
+/* --- Spans ---
+   Os valores vêm de mosaicSolve() (script.js) via variáveis inline, um par por
+   breakpoint. Não são fixos por classe de tamanho porque o span final depende
+   da ORDEM dos banners: quando os cards grandes vão para o fim, o empacotador
+   alarga ou estica vizinhos para fechar as fileiras. As classes
+   .mosaic-item--* continuam existindo, mas só governam tipografia e ícone. */
+.mosaic-item {
+    grid-column: span 1;
+    grid-row: span 1;
+}
+
+@media (min-width: 480px) and (max-width: 767px) {
+    .mosaic-item {
+        grid-column: span var(--sp-sm, 1);
+        grid-row: span var(--rw-sm, 1);
+    }
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+    .mosaic-item {
+        grid-column: span var(--sp-md, 3);
+        grid-row: span var(--rw-md, 1);
+    }
+}
+
+@media (min-width: 1024px) {
+    .mosaic-item {
+        grid-column: span var(--sp-lg, 3);
+        grid-row: span var(--rw-lg, 1);
+    }
+}
+
+/* --- Card --- */
+.mosaic-card {
+    --pad: clamp(0.95rem, 0.72rem + 0.7vw, 1.4rem);
+    /* A base já carrega o matiz do serviço; o banho por cima intensifica. */
+    --surface: color-mix(in srgb, var(--accent, #2563eb) 4%, #ffffff);
+    --stroke: color-mix(in srgb, var(--accent, #2563eb) 22%, rgba(15, 23, 42, 0.07));
+    --title: #0f172a;
+    --muted: #55637a;
+    /* Glifo dentro do chip vivo: claro sobre acento 600 (modo claro),
+       escuro sobre acento 400 (modo escuro) — contraste preservado nos dois. */
+    --glyph: #ffffff;
+    --wash-a: 16%;
+    --wash-b: 5%;
+
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: stretch;
+    width: 100%;
+    min-height: 9rem;
+    padding: var(--pad);
+    text-align: left;
+    border-radius: 1.35rem;
+    border: 1px solid var(--stroke);
+    background-color: var(--surface);
+    /* Camada 1 = brilho diagonal que varre no hover; camada 2 = banho do acento. */
+    background-image:
+        linear-gradient(115deg,
+            transparent 32%,
+            color-mix(in srgb, var(--accent, #2563eb) 20%, transparent) 46%,
+            transparent 62%),
+        linear-gradient(148deg,
+            color-mix(in srgb, var(--accent, #2563eb) var(--wash-a), transparent) 0%,
+            color-mix(in srgb, var(--accent, #2563eb) var(--wash-b), transparent) 52%,
+            transparent 100%);
+    background-size: 230% 100%, 100% 100%;
+    background-position: 150% 0, 0 0;
+    background-repeat: no-repeat;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+    overflow: hidden;
+    isolation: isolate;
+    text-decoration: none;
+    animation: mosaicIn 0.55s cubic-bezier(0.22, 0.85, 0.28, 1) backwards;
+    animation-delay: calc(var(--i, 0) * 45ms);
+    transition:
+        transform 0.34s cubic-bezier(0.34, 1.4, 0.64, 1),
+        box-shadow 0.34s ease,
+        border-color 0.34s ease,
+        background-position 0.75s cubic-bezier(0.3, 0.7, 0.3, 1);
+}
+
+.mosaic-card.is-dark {
+    /* Mais claro que a casca (gray-900 → gray-800) para o card ler como elevado. */
+    --surface: color-mix(in srgb, var(--accent, #60a5fa) 10%, #1a2231);
+    --stroke: color-mix(in srgb, var(--accent, #60a5fa) 26%, rgba(255, 255, 255, 0.07));
+    --title: #f8fafc;
+    --muted: #a3b0c4;
+    --glyph: #0b1220;
+    --wash-a: 24%;
+    --wash-b: 8%;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+}
+
+/* Entrada escalonada — `backwards` (e não `forwards`) para que, ao terminar,
+   o transform volte à cascata normal e o hover continue funcionando. */
+@keyframes mosaicIn {
+    from {
+        opacity: 0;
+        transform: translateY(14px) scale(0.97);
+    }
+
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+
+/* Halo do acento no canto superior direito. */
+.mosaic-card::before {
+    content: '';
+    position: absolute;
+    top: -38%;
+    right: -20%;
+    width: 72%;
+    aspect-ratio: 1 / 1;
+    border-radius: 9999px;
+    background: radial-gradient(circle, var(--accent, #2563eb) 0%, transparent 70%);
+    opacity: 0.22;
+    filter: blur(8px);
+    pointer-events: none;
+    z-index: 0;
+    transition: opacity 0.4s ease, transform 0.55s cubic-bezier(0.22, 0.85, 0.28, 1);
+}
+
+.mosaic-card.is-dark::before {
+    opacity: 0.3;
+}
+
+/* Fio de acento no topo, revelado no hover. */
+.mosaic-card::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: var(--pad);
+    right: var(--pad);
+    height: 2px;
+    border-radius: 0 0 2px 2px;
+    background: linear-gradient(90deg, transparent, var(--accent, #2563eb), transparent);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.35s ease;
+}
+
+.mosaic-card:not(.is-inert):hover,
+.mosaic-card:not(.is-inert):focus-visible {
+    transform: translateY(-5px);
+    border-color: color-mix(in srgb, var(--accent, #2563eb) 62%, transparent);
+    background-position: -50% 0, 0 0;
+    box-shadow:
+        0 22px 44px -20px color-mix(in srgb, var(--accent, #2563eb) 70%, transparent),
+        0 4px 14px rgba(15, 23, 42, 0.08);
+}
+
+.mosaic-card:not(.is-inert):hover::before {
+    opacity: 0.42;
+    transform: scale(1.22);
+}
+
+.mosaic-card.is-dark:not(.is-inert):hover::before {
+    opacity: 0.5;
+}
+
+.mosaic-card:not(.is-inert):hover::after {
+    opacity: 1;
+}
+
+.mosaic-card:not(.is-inert):active {
+    transform: translateY(-1px) scale(0.988);
+    transition-duration: 0.1s;
+}
+
+.mosaic-card:focus-visible {
+    outline: 2px solid var(--accent, #2563eb);
+    outline-offset: 3px;
+}
+
+.mosaic-card.is-inert {
+    cursor: default;
+}
+
+/* Card de grupo: contêiner, não alvo de clique. Perde a elevação e o realce do
+   título — sinais que prometeriam navegação que ele não faz. Borda, halo e
+   varredura continuam respondendo, para não parecer inerte. */
+.mosaic-card.is-group:hover,
+.mosaic-card.is-group:active {
+    transform: none;
+}
+
+.mosaic-card.is-group:not(.is-inert):hover .mosaic-title {
+    color: var(--title);
+}
+
+.mosaic-card.is-muted {
+    opacity: 0.4;
+}
+
+/* Alvo do drop durante a reordenação (admin). Necessário porque, com o
+   empacotamento denso, a posição visual de um card não segue a ordem do
+   array — sem esta marca o admin não sabe onde o card vai cair. */
+.mosaic-card.is-drop-target {
+    outline: 2px dashed var(--accent, #2563eb);
+    outline-offset: 3px;
+    border-color: var(--accent, #2563eb);
+}
+
+.mosaic-card.is-drop-target::before {
+    opacity: 0.4;
+    transform: scale(1.2);
+}
+
+/* --- Interior --- */
+.mosaic-head {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-bottom: 0.9rem;
+}
+
+/* Chip do ícone: acento sólido com glifo em contraste — é o ponto de cor mais
+   saturado do card e o que dá a ele cara de ícone de aplicativo. */
+.mosaic-icon {
+    width: 2.7rem;
+    height: 2.7rem;
+    flex-shrink: 0;
+    border-radius: 0.9rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    color: var(--glyph);
+    /* O gradiente só escurece: clarear o acento derrubaria o glifo branco abaixo
+       de 3:1 nos matizes mais claros (amber 2,76 e green 2,85). Partindo do
+       acento puro, o pior caso é o próprio acento — amber 3,19 é o piso. */
+    background:
+        linear-gradient(150deg,
+            var(--accent, #2563eb) 0%,
+            color-mix(in srgb, var(--accent, #2563eb) 86%, #000) 100%);
+    box-shadow:
+        0 6px 14px -6px color-mix(in srgb, var(--accent, #2563eb) 80%, transparent),
+        inset 0 1px 0 rgba(255, 255, 255, 0.25);
+    transition:
+        transform 0.38s cubic-bezier(0.34, 1.45, 0.64, 1),
+        box-shadow 0.38s ease;
+}
+
+.mosaic-card:not(.is-inert):hover .mosaic-icon {
+    box-shadow:
+        0 10px 22px -8px color-mix(in srgb, var(--accent, #2563eb) 90%, transparent),
+        inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+/* O glifo vetorial pode se inclinar; logotipo não — giro só quando não é imagem. */
+.mosaic-card:not(.is-inert):hover .mosaic-icon:not(.mosaic-icon--img) {
+    transform: translateY(-2px) scale(1.07) rotate(-5deg);
+}
+
+.mosaic-card:not(.is-inert):hover .mosaic-icon--img {
+    transform: translateY(-2px) scale(1.07);
+}
+
+.mosaic-item--hero .mosaic-icon {
+    width: 3.25rem;
+    height: 3.25rem;
+    border-radius: 1.05rem;
+}
+
+/* As imagens de ícone (brasão, NFS-e, bauhaus, entes, bandeira MA) não são
+   glifos em fundo transparente: são tiles já compostos, com fundo opaco e
+   margem interna zero. Elas sangram até a borda e a própria imagem vira a face
+   do ícone — daí o holder perder o chip de acento quando há imagem.
+   ma.png é a única com margem (8,2%/9,4% laterais); `cover` num quadrado
+   recorta 4,3% por lado, ou seja, só margem branca. */
+.mosaic-icon--img {
+    background: transparent;
+    border: 1px solid color-mix(in srgb, var(--accent, #2563eb) 30%, transparent);
+    box-shadow: 0 4px 12px -6px rgba(15, 23, 42, 0.35);
+}
+
+.mosaic-icon--img img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.mosaic-body {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+}
+
+.mosaic-title {
+    font-size: clamp(0.95rem, 0.89rem + 0.22vw, 1.08rem);
+    font-weight: 700;
+    line-height: 1.2;
+    letter-spacing: -0.012em;
+    color: var(--title);
+    transition: color 0.3s ease;
+}
+
+.mosaic-card:not(.is-inert):hover .mosaic-title {
+    color: var(--accent, #2563eb);
+}
+
+.mosaic-item--hero .mosaic-title {
+    font-size: clamp(1.2rem, 1rem + 0.85vw, 1.6rem);
+}
+
+.mosaic-desc {
+    font-size: clamp(0.72rem, 0.69rem + 0.12vw, 0.79rem);
+    line-height: 1.45;
+    color: var(--muted);
+}
+
+.mosaic-item--hero .mosaic-desc {
+    font-size: clamp(0.78rem, 0.73rem + 0.2vw, 0.88rem);
+    max-width: 36ch;
+}
+
+/* --- Pílulas de subserviço ---
+   São o único caminho de acesso aos subserviços (não há mais painel
+   expansível), então cada uma é um alvo clicável de verdade.
+
+   As misturas abaixo não são estéticas por acaso: pílula é texto pequeno e
+   precisa de 4,5:1, não dos 3:1 de elemento gráfico. Texto no acento a 45% e
+   fundo a 10%/16% é a faixa que passa nos 11 acentos E nos dois temas —
+   o pior caso é green 5,98 no claro e cyan 4,59 no escuro. Subir a saturação
+   do texto ou do fundo derruba amber/green/cyan abaixo do mínimo, por isso a
+   ênfase do hover vem de borda, sombra e elevação, não de mais tinta. */
+.mosaic-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin-top: 0.6rem;
+}
+
+.mosaic-chip {
+    display: inline-flex;
+    align-items: center;
+    font-family: inherit;
+    font-size: 0.68rem;
+    font-weight: 600;
+    line-height: 1;
+    padding: 0.36rem 0.6rem;
+    border-radius: 0.55rem;
+    white-space: nowrap;
+    text-decoration: none;
+    color: color-mix(in srgb, var(--accent, #2563eb) 45%, var(--title));
+    background: color-mix(in srgb, var(--accent, #2563eb) 10%, transparent);
+    border: 1px solid color-mix(in srgb, var(--accent, #2563eb) 28%, transparent);
+    transition:
+        background-color 0.25s ease,
+        border-color 0.25s ease,
+        transform 0.28s cubic-bezier(0.34, 1.45, 0.64, 1),
+        box-shadow 0.25s ease;
+}
+
+/* Só as versões interativas reagem; quando o serviço está congelado ou
+   desabilitado a pílula vira <span> e permanece inerte. */
+a.mosaic-chip,
+button.mosaic-chip {
+    cursor: pointer;
+}
+
+a.mosaic-chip:hover,
+button.mosaic-chip:hover,
+a.mosaic-chip:focus-visible,
+button.mosaic-chip:focus-visible {
+    background-color: color-mix(in srgb, var(--accent, #2563eb) 16%, transparent);
+    border-color: var(--accent, #2563eb);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 14px -6px color-mix(in srgb, var(--accent, #2563eb) 75%, transparent);
+}
+
+a.mosaic-chip:focus-visible,
+button.mosaic-chip:focus-visible {
+    outline: 2px solid var(--accent, #2563eb);
+    outline-offset: 2px;
+}
+
+a.mosaic-chip:active,
+button.mosaic-chip:active {
+    transform: translateY(0) scale(0.97);
+    transition-duration: 0.1s;
+}
+
+/* Seta de affordance — ocupa a coluna direita do cabeçalho, sem sobrepor texto. */
+.mosaic-arrow {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.7rem;
+    height: 1.7rem;
+    border-radius: 9999px;
+    color: var(--accent, #2563eb);
+    background: color-mix(in srgb, var(--accent, #2563eb) 14%, transparent);
+    opacity: 0;
+    transform: translateX(-7px);
+    pointer-events: none;
+    transition:
+        opacity 0.3s ease,
+        transform 0.38s cubic-bezier(0.34, 1.45, 0.64, 1),
+        background-color 0.3s ease;
+}
+
+.mosaic-card:not(.is-inert):hover .mosaic-arrow {
+    opacity: 1;
+    transform: translateX(0);
+    background-color: color-mix(in srgb, var(--accent, #2563eb) 22%, transparent);
+}
+
+/* Controles de admin: discretos até o hover, sempre clicáveis. */
+.mosaic-admin {
+    position: relative;
+    z-index: 3;
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    opacity: 0.4;
+    transition: opacity 0.25s ease;
+}
+
+.mosaic-card:hover .mosaic-admin,
+.mosaic-admin:focus-within {
+    opacity: 1;
+}
+
+.mosaic-drag {
+    position: absolute;
+    right: var(--pad);
+    bottom: 0.85rem;
+    z-index: 1;
+    color: var(--muted);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease;
+}
+
+.mosaic-card:hover .mosaic-drag {
+    opacity: 0.6;
+}
+
+/* Reserva a faixa da alça de arraste para o texto não passar por baixo. */
+.mosaic-card.is-admin .mosaic-body {
+    padding-right: 1.8rem;
+}
+
+/* Overlay de congelamento — herda o raio do card. */
+.mosaic-veil {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: inherit;
+    background: rgba(15, 23, 42, 0.12);
+    -webkit-backdrop-filter: blur(2px);
+    backdrop-filter: blur(2px);
+}
+
+.mosaic-card.is-dark .mosaic-veil {
+    background: rgba(0, 0, 0, 0.35);
+}
+
+/* Toque: sem hover persistente, e o feedback vira o próprio :active. */
+@media (hover: none) {
+
+    .mosaic-card:hover {
+        transform: none;
+        background-position: 150% 0, 0 0;
+    }
+
+    .mosaic-arrow {
+        opacity: 0.75;
+        transform: none;
+    }
+
+    .mosaic-drag,
+    .mosaic-admin {
+        opacity: 1;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+    .mosaic-card,
+    .mosaic-card::before,
+    .mosaic-card::after,
+    .mosaic-icon,
+    .mosaic-arrow,
+    .mosaic-title,
+    .mosaic-chip {
+        transition-duration: 0.01ms;
+        animation: none;
+    }
+
+    .mosaic-card:not(.is-inert):hover,
+    .mosaic-card:not(.is-inert):active {
+        transform: none;
+    }
+
+    .mosaic-card:not(.is-inert):hover .mosaic-icon,
+    .mosaic-card:not(.is-inert):hover .mosaic-icon--img {
+        transform: none;
+    }
+}
+
+/* ============================================================
+   HUD DO CABEÇALHO
+
+   Mesma gramática do mosaico — superfície de vidro, traço de 1px, raio,
+   elevação e curva de hover — para o topo não parecer de outro sistema.
+   Os botões têm 2,75rem e raio 0,9rem: exatamente o chip de ícone dos cards.
+
+   O tom de cada botão (--tone) segue o mesmo pareamento claro/escuro dos
+   acentos do mosaico, porque um glifo colorido precisa de 3:1 contra o
+   próprio fundo tintado e um único valor não atende os dois temas.
+   ============================================================ */
+
+/* A folga sob o cabeçalho encolhe junto com a marca em janelas baixas —
+   era um `mb-10` fixo (2,5rem) somado aos ~11rem do bloco empilhado. */
+.hud-header {
+    margin-bottom: clamp(1.1rem, 0.5rem + 1.6vmin, 2.25rem);
+}
+
+@media (max-height: 800px) {
+    .hud-header {
+        margin-bottom: 0.9rem;
+    }
+}
+
+.hud {
+    --hud-surface: rgba(255, 255, 255, 0.72);
+    --hud-solid: #f1f5f9;
+    --hud-stroke: rgba(15, 23, 42, 0.1);
+    --hud-title: #0f172a;
+    --hud-muted: #55637a;
+}
+
+.hud.is-dark {
+    --hud-surface: rgba(26, 34, 49, 0.72);
+    --hud-solid: #131a27;
+    --hud-stroke: rgba(255, 255, 255, 0.1);
+    --hud-title: #f8fafc;
+    --hud-muted: #a3b0c4;
+}
+
+/* --- Painel (perfil, botão Início) --- */
+.hud-panel {
+    display: flex;
+    align-items: center;
+    border-radius: 1.1rem;
+    border: 1px solid var(--hud-stroke);
+    background: var(--hud-surface);
+    -webkit-backdrop-filter: blur(14px);
+    backdrop-filter: blur(14px);
+    box-shadow: 0 12px 28px -20px rgba(15, 23, 42, 0.6);
+    color: var(--hud-title);
+    transition:
+        transform 0.3s cubic-bezier(0.34, 1.4, 0.64, 1),
+        box-shadow 0.3s ease,
+        border-color 0.3s ease;
+}
+
+a.hud-panel:hover,
+button.hud-panel:hover {
+    transform: translateY(-2px);
+    border-color: color-mix(in srgb, var(--tone, #2563eb) 50%, var(--hud-stroke));
+    box-shadow: 0 16px 30px -18px color-mix(in srgb, var(--tone, #2563eb) 65%, transparent);
+}
+
+.hud-name {
+    font-size: 0.95rem;
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: -0.015em;
+    color: var(--hud-title);
+}
+
+.hud-greet {
+    margin-top: 0.35rem;
+    font-size: 0.625rem;
+    font-weight: 800;
+    line-height: 1;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    color: var(--hud-muted);
+}
+
+/* --- Botão de ícone --- */
+.hud-btn {
+    position: relative;
+    width: 2.75rem;
+    height: 2.75rem;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.9rem;
+    color: var(--tone, #2563eb);
+    background: color-mix(in srgb, var(--tone, #2563eb) 12%, var(--hud-surface));
+    border: 1px solid color-mix(in srgb, var(--tone, #2563eb) 28%, transparent);
+    -webkit-backdrop-filter: blur(14px);
+    backdrop-filter: blur(14px);
+    box-shadow: 0 12px 28px -20px rgba(15, 23, 42, 0.6);
+    cursor: pointer;
+    transition:
+        transform 0.3s cubic-bezier(0.34, 1.4, 0.64, 1),
+        box-shadow 0.3s ease,
+        border-color 0.3s ease,
+        background-color 0.3s ease;
+}
+
+.hud.is-dark .hud-btn {
+    background: color-mix(in srgb, var(--tone, #60a5fa) 16%, var(--hud-surface));
+}
+
+.hud-btn:hover {
+    transform: translateY(-2px);
+    border-color: var(--tone, #2563eb);
+    background-color: color-mix(in srgb, var(--tone, #2563eb) 18%, var(--hud-surface));
+    box-shadow: 0 14px 26px -14px color-mix(in srgb, var(--tone, #2563eb) 75%, transparent);
+}
+
+.hud-btn:active {
+    transform: translateY(0) scale(0.96);
+    transition-duration: 0.1s;
+}
+
+.hud-btn:focus-visible {
+    outline: 2px solid var(--tone, #2563eb);
+    outline-offset: 3px;
+}
+
+/* NextChat.png é glifo preto em transparente — invisível no tema escuro se
+   usado como <img>. Entra como máscara para assumir a cor do tom, ficando
+   igual ao ícone de e-mail (SVG) ao lado. */
+.hud-glyph {
+    width: 68%;
+    height: 68%;
+    background-color: currentColor;
+    -webkit-mask: var(--glyph-src) center / contain no-repeat;
+    mask: var(--glyph-src) center / contain no-repeat;
+}
+
+/* Marcador de novidade. */
+.hud-dot {
+    position: absolute;
+    top: -0.22rem;
+    right: -0.22rem;
+    width: 0.72rem;
+    height: 0.72rem;
+    border-radius: 9999px;
+    background: var(--tone, #2563eb);
+    border: 2px solid var(--hud-solid);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--tone, #2563eb) 60%, transparent);
+    animation: hudPing 2.6s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
+}
+
+@keyframes hudPing {
+
+    0%,
+    70%,
+    100% {
+        box-shadow: 0 0 0 0 color-mix(in srgb, var(--tone, #2563eb) 55%, transparent);
+    }
+
+    35% {
+        box-shadow: 0 0 0 0.32rem color-mix(in srgb, var(--tone, #2563eb) 0%, transparent);
+    }
+}
+
+/* --- Tooltip --- */
+.hud-tip {
+    position: absolute;
+    top: calc(100% + 0.6rem);
+    right: 0;
+    white-space: nowrap;
+    padding: 0.4rem 0.7rem;
+    border-radius: 0.6rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--hud-solid);
+    background: var(--hud-title);
+    opacity: 0;
+    transform: translateY(-4px);
+    pointer-events: none;
+    z-index: 50;
+    transition: opacity 0.25s ease, transform 0.25s cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+
+.hud-btn:hover .hud-tip,
+.hud-btn:focus-visible .hud-tip {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+/* --- Avatar --- */
+/* Sem `overflow: hidden` aqui: ele recortaria o ponto de status, que fica
+   deliberadamente na borda. Quem arredonda a foto é o raio da própria <img>. */
+.hud-avatar {
+    position: relative;
+    width: 2.6rem;
+    height: 2.6rem;
+    flex-shrink: 0;
+    border-radius: 0.85rem;
+    background: linear-gradient(150deg, #2563eb 0%, #0891b2 100%);
+    border: 1px solid var(--hud-stroke);
+}
+
+.hud-avatar img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: inherit;
+}
+
+.hud-status {
+    position: absolute;
+    right: -0.15rem;
+    bottom: -0.15rem;
+    width: 0.7rem;
+    height: 0.7rem;
+    border-radius: 9999px;
+    background: #22c55e;
+    border: 2px solid var(--hud-solid);
+}
+
+/* --- Marca central ---
+   Lockup horizontal em vez de pilha. A versão empilhada (logo → kicker →
+   DIAAF → régua) somava ~11rem de altura e empurrava o mosaico para fora da
+   primeira dobra em telas de notebook; em uma linha fica em ~3,5rem.
+
+   As medidas escalam por `vmin`, não `vw`: aqui o recurso escasso é a ALTURA
+   da janela, então uma tela larga e baixa precisa encolher o logo, coisa que
+   `vw` faria ao contrário. Abaixo de 800px de altura há um degrau extra. */
+/* Barra do cabeçalho. `flex-wrap` é o que permite um único nó de marca servir
+   aos dois arranjos: em telas largas ela sai do fluxo e é centrada de fato; em
+   telas estreitas volta ao fluxo e quebra para a linha de baixo. */
+.hud-bar {
+    position: relative;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
+.hud-brand {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: clamp(0.65rem, 0.45rem + 0.7vmin, 1.05rem);
+    padding: 0.15rem 0 0.6rem;
+}
+
+/* Estreito: a marca desce para a própria linha, ocupando a largura toda. */
+.hud-brand--bar {
+    order: 3;
+    flex-basis: 100%;
+    padding: 0.35rem 0 0;
+}
+
+/* Largo: centrada na barra, na mesma linha do destaque do usuário.
+   Centrar por posicionamento absoluto — e não como item flex — porque os
+   grupos laterais têm larguras diferentes: o centro do espaço sobrante entre
+   eles não é o centro da tela. */
+@media (min-width: 1024px) {
+    .hud-brand--bar {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        order: 0;
+        flex-basis: auto;
+        padding: 0;
+    }
+
+    /* Dentro da barra o halo compete com os painéis vizinhos; fica menor. */
+    .hud-brand--bar .hud-brand-glow {
+        width: 10rem;
+        height: 4.5rem;
+        opacity: 0.12;
+    }
+}
+
+.hud-brand-glow {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 13rem;
+    height: 6rem;
+    transform: translate(-50%, -50%);
+    border-radius: 9999px;
+    background: radial-gradient(ellipse, #3b82f6 0%, transparent 70%);
+    opacity: 0.16;
+    filter: blur(28px);
+    pointer-events: none;
+}
+
+.hud-brand-mark {
+    position: relative;
+    height: clamp(2.35rem, 1.75rem + 2vmin, 3.35rem);
+    width: auto;
+    object-fit: contain;
+    flex-shrink: 0;
+    filter: drop-shadow(0 6px 14px rgba(37, 99, 235, 0.28));
+}
+
+.hud-brand-sep {
+    position: relative;
+    width: 1px;
+    align-self: stretch;
+    margin: 0.3rem 0;
+    background: linear-gradient(180deg, transparent, var(--hud-stroke), transparent);
+}
+
+.hud-brand-text {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.2rem;
+}
+
+.hud-brand-title {
+    font-size: clamp(1.3rem, 0.95rem + 1.5vmin, 2.15rem);
+    font-weight: 900;
+    line-height: 0.95;
+    letter-spacing: -0.04em;
+    white-space: nowrap;
+    background: linear-gradient(100deg, #2563eb 0%, #06b6d4 50%, #6366f1 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+}
+
+.hud.is-dark .hud-brand-title {
+    background: linear-gradient(100deg, #60a5fa 0%, #22d3ee 50%, #818cf8 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+}
+
+/* Janela baixa (notebook 768p e afins): o cabeçalho cede espaço ao conteúdo. */
+@media (max-height: 800px) {
+    .hud-brand {
+        gap: 0.6rem;
+        padding: 0 0 0.4rem;
+    }
+
+    .hud-brand-mark {
+        height: 2.2rem;
+    }
+
+    .hud-brand-title {
+        font-size: 1.3rem;
+    }
+
+    .hud-brand-glow {
+        opacity: 0.12;
+    }
+}
+
+/* Telas muito estreitas: "Painel DIAAF" é mais largo que o "DIAAF" isolado,
+   então o corpo cede antes de a linha correr risco de quebrar. */
+@media (max-width: 380px) {
+    .hud-brand-title {
+        font-size: 1.15rem;
+    }
+
+    .hud-brand-mark {
+        height: 2rem;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+    .hud-panel,
+    .hud-btn,
+    .hud-tip {
+        transition-duration: 0.01ms;
+    }
+
+    .hud-dot {
+        animation: none;
+    }
+
+    .hud-btn:hover,
+    .hud-btn:active,
+    a.hud-panel:hover,
+    button.hud-panel:hover {
+        transform: none;
+    }
+}

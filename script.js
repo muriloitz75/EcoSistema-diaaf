@@ -2095,12 +2095,136 @@ function Sidebar({ darkMode, currentView, setCurrentView, currentUser, onLogout,
     );
 }
 
+// ==================== EMPACOTADOR DO MOSAICO ====================
+// O `grid-auto-flow: dense` do CSS só tapa uma lacuna com um item POSTERIOR que
+// caiba nela. Quando os cards grandes vão para o fim da ordem — o que acontece
+// quando o admin os arrasta para baixo — não sobra ninguém depois para tapar o
+// buraco que eles deixam, e a lacuna persiste.
+//
+// Aqui a grade é simulada com o mesmo algoritmo do navegador (primeiro encaixe
+// a partir do topo, que é o que `dense` faz) e os spans são ajustados até as
+// fileiras fecharem. Alargar é preferido a esticar, porque não altera a altura
+// da fileira; altura 3 é último recurso.
+const MOSAIC_UNITS = {
+    12: { hero: [6, 2], wide: [6, 1], tall: [3, 2], std: [3, 1] },
+    6: { hero: [6, 2], wide: [6, 1], tall: [3, 2], std: [3, 1] },
+    2: { hero: [2, 2], wide: [2, 1], tall: [1, 2], std: [1, 1] }
+};
+
+function mosaicPlace(boxes, cols) {
+    const g = [];
+    const ens = r => { while (g.length <= r) g.push(new Array(cols).fill(-1)); };
+    const fits = (r, c, w, h) => {
+        if (c + w > cols) return false;
+        for (let i = 0; i < h; i++) { ens(r + i); for (let j = 0; j < w; j++) if (g[r + i][c + j] >= 0) return false; }
+        return true;
+    };
+    const put = (x, r, c, w, h) => { for (let i = 0; i < h; i++) { ens(r + i); for (let j = 0; j < w; j++) g[r + i][c + j] = x; } };
+    const pos = [];
+    boxes.forEach(([w, h], x) => {
+        let done = false;
+        for (let r = 0; !done; r++) for (let c = 0; c < cols; c++) if (fits(r, c, w, h)) { put(x, r, c, w, h); pos[x] = { r, c, w, h }; done = true; break; }
+    });
+    return { g, pos };
+}
+
+function mosaicHoles(g) {
+    const out = [];
+    for (let r = 0; r < g.length; r++) {
+        let c = 0;
+        while (c < g[r].length) {
+            if (g[r][c] >= 0) { c++; continue; }
+            let e = c; while (e < g[r].length && g[r][e] < 0) e++;
+            out.push({ r, c, w: e - c });
+            c = e;
+        }
+    }
+    return out;
+}
+
+function mosaicSolve(sizes, cols, capH = 3, maxPass = 8) {
+    const units = MOSAIC_UNITS[cols] || MOSAIC_UNITS[12];
+    const boxes = sizes.map(s => [...(units[s] || units.std)]);
+    if (!boxes.length) return boxes;
+
+    for (let pass = 0; pass < maxPass; pass++) {
+        const { g, pos } = mosaicPlace(boxes, cols);
+        const holes = mosaicHoles(g);
+        if (!holes.length) break;
+
+        const alargaEsquerda = hole => {
+            const left = hole.c > 0 ? g[hole.r][hole.c - 1] : -1;
+            if (left < 0) return false;
+            const p = pos[left];
+            if (p.c + p.w !== hole.c || p.w + hole.w > cols) return false;
+            for (let i = 0; i < p.h; i++) for (let j = hole.c; j < hole.c + hole.w; j++)
+                if (g[p.r + i] && g[p.r + i][j] >= 0) return false;
+            boxes[left][0] += hole.w; return true;
+        };
+        const alargaDireita = hole => {
+            const right = hole.c + hole.w < cols ? g[hole.r][hole.c + hole.w] : -1;
+            if (right < 0) return false;
+            const p = pos[right];
+            if (p.r !== hole.r || p.c !== hole.c + hole.w || p.w + hole.w > cols) return false;
+            boxes[right][0] += hole.w; return true;
+        };
+        const estica = limite => hole => {
+            const up = hole.r > 0 ? g[hole.r - 1][hole.c] : -1;
+            if (up < 0) return false;
+            const p = pos[up];
+            if (p.c < hole.c || p.c + p.w > hole.c + hole.w) return false;
+            if (p.r + p.h !== hole.r || p.h >= limite) return false;
+            boxes[up][1] += 1; return true;
+        };
+
+        let changed = false;
+        for (const regra of [alargaEsquerda, alargaDireita, estica(2), estica(capH)]) {
+            for (const hole of holes) if (regra(hole)) { changed = true; break; }
+            if (changed) break;
+        }
+        if (!changed) break; // não dá para fechar; entrega o que já melhorou
+    }
+    return boxes;
+}
+
 // ==================== PAINEL DE CONTROLE DE BANNERS ====================
+// Paleta de acentos do mosaico. A cor entra apenas como identidade do serviço
+// (ícone, halo e foco) — a superfície do card permanece neutra.
+const MOSAIC_ACCENTS = {
+    blue: { light: '#2563eb', dark: '#60a5fa' },
+    indigo: { light: '#4f46e5', dark: '#818cf8' },
+    violet: { light: '#7c3aed', dark: '#a78bfa' },
+    fuchsia: { light: '#c026d3', dark: '#e879f9' },
+    rose: { light: '#e11d48', dark: '#fb7185' },
+    red: { light: '#dc2626', dark: '#f87171' },
+    amber: { light: '#d97706', dark: '#fbbf24' },
+    green: { light: '#16a34a', dark: '#4ade80' },
+    emerald: { light: '#059669', dark: '#34d399' },
+    cyan: { light: '#0891b2', dark: '#22d3ee' },
+    slate: { light: '#475569', dark: '#94a3b8' }
+};
+
+const mosaicAccent = (accent, darkMode) =>
+    (MOSAIC_ACCENTS[accent] || MOSAIC_ACCENTS.blue)[darkMode ? 'dark' : 'light'];
+
+// Tons dos botões do cabeçalho. Pares claro/escuro validados a >= 3:1 do glifo
+// contra o próprio fundo tintado — amber-600 reprova no claro (2,74), por isso
+// o e-mail usa amber-700 lá e amber-400 aqui.
+const HEADER_TONES = {
+    theme: { light: '#4f46e5', dark: '#fbbf24' },
+    chat: { light: '#2563eb', dark: '#60a5fa' },
+    mail: { light: '#b45309', dark: '#fbbf24' }
+};
+
+const headerTone = (key, darkMode) => HEADER_TONES[key][darkMode ? 'dark' : 'light'];
+
 // Config estática dos banners (UI, cores, links)
 const BANNER_STATIC = {
     'iss-cnae': {
         label: 'Consultas Fiscais',
         menu: 'home',
+        accent: 'blue',
+        size: 'hero',
         description: 'Acesse os serviços de consulta fiscal',
         icon: 'M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z',
         light: 'from-blue-50 to-purple-50 border-blue-400 hover:border-blue-500',
@@ -2114,6 +2238,8 @@ const BANNER_STATIC = {
     'pareceres': {
         label: 'Gerador de Pareceres',
         menu: 'home',
+        accent: 'emerald',
+        size: 'std',
         description: 'Gere pareceres fiscais automaticamente',
         icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z',
         href: 'https://opinion-factory-production.up.railway.app/',
@@ -2126,6 +2252,8 @@ const BANNER_STATIC = {
     'processos': {
         label: 'Análise de Processos',
         menu: 'home',
+        accent: 'violet',
+        size: 'std',
         description: 'Visualize e analise processos fiscais',
         icon: 'M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z',
         href: 'https://reportterra-diaaf.up.railway.app/login',
@@ -2138,6 +2266,8 @@ const BANNER_STATIC = {
     'painel-distribuicao': {
         label: 'Painel de Distribuição',
         menu: 'home',
+        accent: 'amber',
+        size: 'std',
         description: 'Acesse o Painel de Distribuição de Processos',
         icon: 'M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z',
         href: 'https://planilha-magica.up.railway.app/',
@@ -2150,6 +2280,8 @@ const BANNER_STATIC = {
     'nfse-nacional': {
         label: 'Gestão da NFS-e',
         menu: 'home',
+        accent: 'cyan',
+        size: 'std',
         description: 'Acesso exclusivo aos servidores para controle e painel do sistema nacional',
         imageIcon: 'image/nfs-e.png',
         imageClass: 'w-full h-full object-cover rounded-full',
@@ -2163,6 +2295,8 @@ const BANNER_STATIC = {
     'diario-oficial': {
         label: 'Diário Oficial',
         menu: 'home',
+        accent: 'slate',
+        size: 'tall',
         description: 'Publicações do Diário Oficial de Imperatriz',
         imageIcon: 'image/brasao.png',
         imageClass: 'w-full h-full object-cover rounded-full',
@@ -2176,6 +2310,8 @@ const BANNER_STATIC = {
     'dte': {
         label: 'Prefeitura Moderna',
         menu: 'home',
+        accent: 'rose',
+        size: 'hero',
         description: 'O seu portal centralizado para serviços e tributos municipais',
         imageIcon: 'image/bauhaus.png',
         imageClass: 'w-full h-full object-cover rounded-full',
@@ -2191,6 +2327,8 @@ const BANNER_STATIC = {
     'arrecadacao': {
         label: 'Transparência',
         menu: 'home',
+        accent: 'fuchsia',
+        size: 'std',
         description: 'Acompanhe as contas públicas do município',
         imageIcon: 'image/brasao.png',
         imageClass: 'w-full h-full object-cover rounded-full',
@@ -2204,6 +2342,8 @@ const BANNER_STATIC = {
     'receita': {
         label: 'Arrecadação',
         menu: 'home',
+        accent: 'green',
+        size: 'std',
         description: 'Painel gerencial de indicadores tributários',
         icon: 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z',
         href: 'https://arrec-itz.up.railway.app/',
@@ -2216,6 +2356,8 @@ const BANNER_STATIC = {
     'entes': {
         label: 'Entes Federados',
         menu: 'home',
+        accent: 'indigo',
+        size: 'std',
         description: 'Acesso aos Entes Federados',
         imageIcon: 'image/entes.png',
         imageClass: 'w-full h-full object-cover rounded-full',
@@ -2229,6 +2371,8 @@ const BANNER_STATIC = {
     'empresa-facil': {
         label: 'Empresa Fácil',
         menu: 'home',
+        accent: 'red',
+        size: 'std',
         description: 'Acesso Rápido Empresa Fácil MA',
         imageIcon: 'image/ma.png',
         imageClass: 'w-full h-full object-cover rounded-full',
@@ -2242,6 +2386,8 @@ const BANNER_STATIC = {
     'biblioteca': {
         label: 'Biblioteca',
         menu: 'home',
+        accent: 'amber',
+        size: 'wide',
         description: 'Acervo de legislação, normas e documentos municipais',
         icon: 'M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253',
         light: 'from-amber-50 to-yellow-50 border-amber-200 hover:border-amber-300',
@@ -2903,12 +3049,9 @@ function App() {
     const [adminUsersListKey, setAdminUsersListKey] = useState(0);
     const [auditUserFilter, setAuditUserFilter] = useState('');
     const [auditTypeFilter, setAuditTypeFilter] = useState(''); // 'banner', 'login_failure', etc.
-    const [dteModalOpen, setDteModalOpen] = useState(false);
-    const [consultasModalOpen, setConsultasModalOpen] = useState(false);
     const [bibliotecaModalOpen, setBibliotecaModalOpen] = useState(false);
     const [bibliotecaCategoria, setBibliotecaCategoria] = useState(null);
     const [bibliotecaSearch, setBibliotecaSearch] = useState('');
-    const [expandedBanner, setExpandedBanner] = useState(null); // ID do banner atualmente expandido (accordion)
 
     const handleSortBanners = async () => {
         if (!currentUser || currentUser.role !== 'admin') return;
@@ -2947,6 +3090,7 @@ function App() {
     const dragOverItem = useRef();
     const [isReorderingBanners, setIsReorderingBanners] = useState(false);
     const [isDraggingBanners, setIsDraggingBanners] = useState(false); // New state for global CSS
+    const [dragOverBannerId, setDragOverBannerId] = useState(null); // Card sob o cursor durante o arraste
 
     const [freezeModalBanner, setFreezeModalBanner] = useState(null);
 
@@ -3806,19 +3950,20 @@ function App() {
             <div className="flex-1 overflow-y-auto">
                 <div className={`min-h-screen transition-all duration-500 ${darkMode ? 'bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900' : 'bg-gradient-to-br from-gray-100 via-gray-50 to-gray-100'}`}>
                     <div className="container mx-auto px-4 py-8 max-w-6xl">
-                        <header className="mb-10 relative z-[20]">
-                            {/* Header Desconstruída: Elementos nos cantos superiores */}
-                            <div className="flex justify-between items-start pt-2 px-2 transition-all duration-500">
+                        <header className={`hud-header relative z-[20] hud ${darkMode ? 'is-dark' : ''}`}>
+                            {/* Barra: perfil à esquerda, marca ao centro, atalhos à direita. */}
+                            <div className="hud-bar pt-2 px-2">
 
                                 {/* Grupo Esquerdo: Menu Mobile e Perfil/Saudação */}
-                                <div className="flex items-center gap-4 animate-fadeInLeft">
+                                <div className="flex items-center gap-3 animate-fadeInLeft">
                                     <button
                                         type="button"
                                         onClick={() => setSidebarMobileOpen(true)}
-                                        className={`sidebar-toggle-mobile md:hidden flex items-center justify-center p-3 rounded-2xl shadow-lg backdrop-blur-md transition-all active:scale-95 ${darkMode ? 'bg-gray-800/80 text-white' : 'bg-white/80 text-gray-700'}`}
+                                        className="sidebar-toggle-mobile md:hidden hud-btn"
+                                        style={{ '--tone': headerTone('chat', darkMode) }}
                                         aria-label="Abrir menu"
                                     >
-                                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
                                         </svg>
                                     </button>
@@ -3827,10 +3972,8 @@ function App() {
                                     {currentView !== 'home' ? (
                                         <button
                                             onClick={() => setCurrentView('home')}
-                                            className={`glass-card-header flex items-center gap-2 px-5 py-3 rounded-2xl font-bold text-sm transition-all duration-300 hover:scale-105 active:scale-95 ${darkMode
-                                                ? 'text-gray-200'
-                                                : 'text-gray-700'
-                                                } shadow-xl`}
+                                            className="hud-panel gap-2 px-4 py-2.5 font-bold text-sm"
+                                            style={{ '--tone': headerTone('chat', darkMode) }}
                                         >
                                             <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
@@ -3840,58 +3983,55 @@ function App() {
                                     ) : (
                                         currentUser && (
                                             <div className="flex items-center gap-3">
-                                                {/* Seletor de Tema (Reposicionado como solicitado) */}
-                                                <div className="glass-card-header flex items-center p-1.5 rounded-2xl shadow-xl">
-                                                    <button
-                                                        onClick={() => setDarkMode(!darkMode)}
-                                                        className={`p-2.5 rounded-xl transition-all duration-300 active:scale-95 ${darkMode ? 'bg-blue-600/20 text-yellow-400 hover:bg-blue-600/30' : 'bg-blue-50 text-blue-600 hover:bg-blue-100'}`}
-                                                        title={darkMode ? 'Modo Claro' : 'Modo Escuro'}
-                                                    >
-                                                        {darkMode ? (
-                                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
-                                                            </svg>
-                                                        ) : (
-                                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
-                                                            </svg>
-                                                        )}
-                                                    </button>
-                                                </div>
+                                                <button
+                                                    onClick={() => setDarkMode(!darkMode)}
+                                                    className="hud-btn"
+                                                    style={{ '--tone': headerTone('theme', darkMode) }}
+                                                    aria-label={darkMode ? 'Ativar modo claro' : 'Ativar modo escuro'}
+                                                >
+                                                    {darkMode ? (
+                                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                                                        </svg>
+                                                    ) : (
+                                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                                                        </svg>
+                                                    )}
+                                                    <span className="hud-tip" style={{ right: 'auto', left: 0 }}>
+                                                        {darkMode ? 'Modo Claro' : 'Modo Escuro'}
+                                                    </span>
+                                                </button>
 
-                                                <div className="glass-card-header flex items-center gap-4 px-5 py-3 rounded-2xl shadow-xl transition-all duration-300 hover:translate-y-[-2px]">
-                                                    <div className="relative group">
-                                                        <div className={`w-11 h-11 rounded-full flex items-center justify-center shadow-lg transform transition-all group-hover:scale-110 overflow-hidden ring-2 ${darkMode ? 'ring-blue-500/30' : 'ring-cyan-500/20'} bg-gradient-to-tr from-blue-600 to-cyan-600`}>
-                                                            {(() => {
-                                                                const firstName = (currentUser.name?.split(' ')[0] || currentUser.username || '').toLowerCase();
-                                                                const femaleNames = ['maria', 'ana', 'julia', 'juliana', 'fernanda', 'patricia', 'aline', 'bruna', 'camila', 'jessica', 'amanda', 'leticia', 'beatriz', 'vanessa', 'mariana', 'gabriela', 'larissa', 'daniela', 'carla', 'renata'];
-                                                                const isFemale = femaleNames.includes(firstName) || firstName.endsWith('a') || firstName.endsWith('e');
-                                                                const avatarSrc = isFemale ? 'image/mulher.png' : 'image/homem.png';
+                                                <div className="hud-panel gap-3 pl-2.5 pr-4 py-2.5">
+                                                    <div className="hud-avatar">
+                                                        {(() => {
+                                                            const firstName = (currentUser.name?.split(' ')[0] || currentUser.username || '').toLowerCase();
+                                                            const femaleNames = ['maria', 'ana', 'julia', 'juliana', 'fernanda', 'patricia', 'aline', 'bruna', 'camila', 'jessica', 'amanda', 'leticia', 'beatriz', 'vanessa', 'mariana', 'gabriela', 'larissa', 'daniela', 'carla', 'renata'];
+                                                            const isFemale = femaleNames.includes(firstName) || firstName.endsWith('a') || firstName.endsWith('e');
+                                                            const avatarSrc = isFemale ? 'image/mulher.png' : 'image/homem.png';
 
-                                                                return (
-                                                                    <img
-                                                                        src={avatarSrc}
-                                                                        alt="Avatar"
-                                                                        className="w-full h-full object-cover"
-                                                                        onError={(e) => {
-                                                                            e.target.style.display = 'none';
-                                                                            e.target.nextSibling.style.display = 'block';
-                                                                        }}
-                                                                    />
-                                                                );
-                                                            })()}
-                                                            <span className="text-white font-bold text-xs tracking-widest absolute" style={{ display: 'none' }}>
-                                                                {currentUser?.name?.substring(0, 2).toUpperCase() || currentUser?.username.substring(0, 2).toUpperCase() || 'AD'}
-                                                            </span>
-                                                        </div>
-                                                        <div className={`absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full flex items-center justify-center border-2 border-white dark:border-gray-800 ${darkMode ? 'bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.5)]' : 'bg-green-400'}`}>
-                                                        </div>
+                                                            return (
+                                                                <img
+                                                                    src={avatarSrc}
+                                                                    alt="Avatar"
+                                                                    onError={(e) => {
+                                                                        e.target.style.display = 'none';
+                                                                        e.target.nextSibling.style.display = 'flex';
+                                                                    }}
+                                                                />
+                                                            );
+                                                        })()}
+                                                        <span className="absolute inset-0 items-center justify-center text-white font-bold text-xs tracking-widest" style={{ display: 'none' }}>
+                                                            {currentUser?.name?.substring(0, 2).toUpperCase() || currentUser?.username.substring(0, 2).toUpperCase() || 'AD'}
+                                                        </span>
+                                                        <span className="hud-status"></span>
                                                     </div>
                                                     <div className="hidden sm:block">
-                                                        <h2 className={`font-bold text-base tracking-tight leading-none ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                                                        <h2 className="hud-name">
                                                             {currentUser.name?.split(' ')[0] || currentUser.username}
                                                         </h2>
-                                                        <p className={`text-[10px] uppercase font-black tracking-widest mt-1.5 opacity-70 ${darkMode ? 'text-blue-400' : 'text-blue-600'}`}>
+                                                        <p className="hud-greet">
                                                             {new Date().getHours() < 12 ? 'Bom dia' : new Date().getHours() < 18 ? 'Boa tarde' : 'Boa noite'}
                                                         </p>
                                                     </div>
@@ -3901,58 +4041,57 @@ function App() {
                                     )}
                                 </div>
 
-                                {/* Grupo Direito: Controles (NextChat com Destaque) */}
+                                {/* Marca central — mesma linha do destaque do usuário. Fica
+                                    absolutamente centrada na barra a partir de lg, para o centro
+                                    ser o da tela e não o sobrante entre grupos de larguras
+                                    diferentes; abaixo disso quebra para a própria linha. */}
+                                {currentView === 'home' && (
+                                    <div className="hud-brand hud-brand--bar animate-fadeInDown">
+                                        <div className="hud-brand-glow" aria-hidden="true"></div>
+                                        <img
+                                            src="image/ecossistema3.png"
+                                            alt=""
+                                            className="hud-brand-mark"
+                                        />
+                                        <span className="hud-brand-sep" aria-hidden="true"></span>
+                                        <div className="hud-brand-text">
+                                            <h1 className="hud-brand-title">Painel DIAAF</h1>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Grupo Direito: Atalhos externos */}
                                 <div className="flex items-center gap-3 animate-fadeInRight">
                                     {currentView === 'home' && (
-                                        <div className="glass-card-header flex items-center gap-2 p-1 rounded-2xl shadow-xl">
-                                            <div className="relative flex items-center gap-3">
-                                                <a
-                                                    href="https://app.bbgov360.com.br/atendimento?id=8340618"
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="relative group p-0.5 rounded-2xl transition-all duration-300 hover:scale-110 active:scale-95 ring-2 ring-blue-500/20 bg-blue-500/5 shadow-inner"
-                                                    title="NextChat"
-                                                >
-                                                    <div className="w-12 h-12 overflow-hidden rounded-xl shadow-lg border-2 border-white/40 ring-4 ring-blue-400/10 animate-pulse-subtle bg-white flex items-center justify-center p-1">
-                                                        <img
-                                                            src="image/NextChat.png"
-                                                            alt="NextChat"
-                                                            className="w-full h-full object-contain"
-                                                        />
-                                                    </div>
-                                                    {/* Badge de Destaque */}
-                                                    <div className={`absolute top-0 -right-1 w-4 h-4 rounded-full border-2 border-white bg-blue-500 ${darkMode ? 'shadow-[0_0_10px_rgba(59,130,246,0.6)]' : ''}`}></div>
+                                        <>
+                                            <a
+                                                href="https://app.bbgov360.com.br/atendimento?id=8340618"
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="hud-btn"
+                                                style={{ '--tone': headerTone('chat', darkMode) }}
+                                                aria-label="Atendimento Virtual"
+                                            >
+                                                <span className="hud-glyph" style={{ '--glyph-src': "url('image/NextChat.png')" }}></span>
+                                                <span className="hud-dot"></span>
+                                                <span className="hud-tip">Atendimento Virtual</span>
+                                            </a>
 
-                                                    <div className="absolute top-[60px] right-0 whitespace-nowrap px-4 py-2 rounded-xl text-sm font-bold opacity-0 group-hover:opacity-100 transition-all duration-300 translate-y-2 group-hover:translate-y-0 pointer-events-none shadow-2xl bg-blue-600 text-white z-50">
-                                                        <div className="absolute top-[-6px] right-4 w-0 h-0 border-l-[6px] border-r-[6px] border-b-[6px] border-transparent border-b-blue-600"></div>
-                                                        Atendimento Virtual
-                                                    </div>
-                                                </a>
-
-                                                {/* E-mail Institucional */}
-                                                <a
-                                                    href="https://mail.imperatriz.ma.gov.br/"
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="relative group p-0.5 rounded-2xl transition-all duration-300 hover:scale-110 active:scale-95 ring-2 ring-amber-500/20 bg-amber-500/5 shadow-inner"
-                                                    title="E-mail Institucional"
-                                                >
-                                                    <div className={`w-12 h-12 overflow-hidden rounded-xl shadow-lg border-2 border-white/40 ring-4 ring-amber-400/10 transition-all ${darkMode ? 'bg-gray-800' : 'bg-white'} flex items-center justify-center`}>
-                                                        <svg className={`w-7 h-7 ${darkMode ? 'text-amber-400' : 'text-amber-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                                                        </svg>
-                                                    </div>
-
-                                                    {/* Badge de Destaque (Email) */}
-                                                    <div className={`absolute top-0 -right-1 w-4 h-4 rounded-full border-2 border-white bg-amber-500 ${darkMode ? 'shadow-[0_0_10px_rgba(245,158,11,0.6)]' : ''}`}></div>
-
-                                                    <div className="absolute top-[60px] right-0 whitespace-nowrap px-4 py-2 rounded-xl text-sm font-bold opacity-0 group-hover:opacity-100 transition-all duration-300 translate-y-2 group-hover:translate-y-0 pointer-events-none shadow-2xl bg-amber-600 text-white z-50">
-                                                        <div className="absolute top-[-6px] right-4 w-0 h-0 border-l-[6px] border-r-[6px] border-b-[6px] border-transparent border-b-amber-600"></div>
-                                                        E-mail Institucional
-                                                    </div>
-                                                </a>
-                                            </div>
-                                        </div>
+                                            <a
+                                                href="https://mail.imperatriz.ma.gov.br/"
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="hud-btn"
+                                                style={{ '--tone': headerTone('mail', darkMode) }}
+                                                aria-label="E-mail Institucional"
+                                            >
+                                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                                                </svg>
+                                                <span className="hud-dot"></span>
+                                                <span className="hud-tip">E-mail Institucional</span>
+                                            </a>
+                                        </>
                                     )}
                                 </div>
                             </div>
@@ -3989,98 +4128,202 @@ function App() {
                             />
                         )}
 
-                        {currentView === 'home' && (
+                        {currentView === 'home' && (() => {
+                            const isAdmin = currentUser?.role === 'admin';
+                            const homeBanners = bannerConfig
+                                .filter(b => (BANNER_STATIC[b.key]?.menu || 'home') === 'home')
+                                .filter(b => isAdmin || b.enabled);
+
+                            // Spans resolvidos por breakpoint. Cada largura de grade tem o seu
+                            // empacotamento — não dá para derivar um do outro por proporção.
+                            const sizeList = homeBanners.map(b => BANNER_STATIC[b.key]?.size || 'std');
+                            const spanLg = mosaicSolve(sizeList, 12);
+                            const spanMd = mosaicSolve(sizeList, 6);
+                            const spanSm = mosaicSolve(sizeList, 2);
+
+                            return (
                             <div className="animate-fadeInUp space-y-4">
-                                {/* Faixada Central de Serviços */}
-                                <div className="text-center relative py-1 flex flex-col items-center">
-                                    <div className={`absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 w-20 h-20 blur-3xl rounded-full opacity-20 ${darkMode ? 'bg-blue-500' : 'bg-blue-400'}`}></div>
-
-                                    {/* Logo Branding Dashboard */}
-                                    <div className="relative mb-1 animate-fadeInDown">
-                                        <img
-                                            src="image/ecossistema3.png"
-                                            alt="EcoSistema Logo"
-                                            className="h-14 md:h-16 w-auto object-contain drop-shadow-xl"
-                                        />
-                                    </div>
-
-                                    <h2 className={`relative text-[9px] md:text-[10px] font-black tracking-[0.4em] uppercase mb-0.5 ${darkMode ? 'text-blue-400' : 'text-blue-600'}`}>
-                                        Central de Serviços
-                                    </h2>
-                                    <h1 className={`relative text-2xl md:text-3xl font-black tracking-tighter ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                                        DIAAF
-                                    </h1>
-                                    <div className={`mt-2 mx-auto w-10 h-0.5 rounded-full ${darkMode ? 'bg-gray-700' : 'bg-gray-200'}`}></div>
-                                </div>
-
-                                <div className={`grid gap-4 mt-1 ${bannerConfig.filter(b => (BANNER_STATIC[b.key]?.menu || 'home') === 'home' && (currentUser?.role === 'admin' || b.enabled)).length === 1 ? 'grid-cols-1 max-w-xs mx-auto' :
-                                    bannerConfig.filter(b => (BANNER_STATIC[b.key]?.menu || 'home') === 'home' && (currentUser?.role === 'admin' || b.enabled)).length === 2 ? 'grid-cols-1 md:grid-cols-2' :
-                                        'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
-                                    }`}>
-                                    {bannerConfig
-                                        .filter(b => (BANNER_STATIC[b.key]?.menu || 'home') === 'home')
-                                        .filter(b => currentUser?.role === 'admin' || b.enabled)
+                                {/* Empacotamento denso para todos, admin inclusive. Sem ele, um card de
+                                    6 colunas que não cabe nas 3 restantes deixa um buraco na fileira —
+                                    e o admin acabava arrumando um layout diferente do que o usuário vê.
+                                    O arraste continua correto porque o alvo do drop é um elemento
+                                    (o card sob o cursor), não uma célula geométrica da grade. */}
+                                <div className="mosaic-grid mt-1 is-dense">
+                                    {homeBanners
                                         .map((banner, index) => {
                                             const s = BANNER_STATIC[banner.key];
                                             if (!s) return null;
-                                            const isAdmin = currentUser?.role === 'admin';
                                             const isDisabledForUser = !banner.enabled && !isAdmin;
                                             const isFrozen = banner.isFrozen === true;
                                             const isEffectivelyFrozen = isFrozen && !isAdmin;
+                                            const isInert = isDisabledForUser || s.comingSoon || isEffectivelyFrozen;
 
-                                            const cardClass = `flex flex-col items-center justify-center p-4 md:p-5 rounded-2xl border-2 transition-all transform hover:-translate-y-1 hover:shadow-2xl ${darkMode
-                                                ? `bg-gradient-to-br ${s.dark}`
-                                                : `bg-gradient-to-br ${s.light}`
-                                                } group relative overflow-hidden ${isDisabledForUser ? 'opacity-40 cursor-default hover:translate-y-0 hover:shadow-none' : ''
-                                                } ${(s.comingSoon || isEffectivelyFrozen) ? 'cursor-default hover:translate-y-0 hover:shadow-none opactity-75' : ''
-                                                } ${(isAdmin || (isFrozen && isAdmin)) ? 'cursor-pointer active:cursor-grabbing' : ''}`;
+                                            const size = s.size || 'std';
+                                            const accent = mosaicAccent(s.accent, darkMode);
+
+                                            // Os subserviços vivem só nas pílulas: cada uma carrega a própria
+                                            // ação, e a lista não é truncada — truncar deixaria serviço
+                                            // inalcançável agora que não há mais painel expansível.
+                                            const subItems = (() => {
+                                                const keys = banner.key === 'dte' ? DTE_SUB_BANNERS_KEYS
+                                                    : banner.key === 'iss-cnae' ? CONSULTAS_FISCAIS_SUB_BANNERS_KEYS
+                                                        : [];
+                                                if (keys.length) {
+                                                    return keys
+                                                        .filter(k => bannerConfig.find(bc => bc.key === k)?.enabled !== false)
+                                                        .map(k => {
+                                                            const sub = BANNER_STATIC[k];
+                                                            if (!sub) return null;
+                                                            return {
+                                                                id: k,
+                                                                label: sub.label,
+                                                                href: sub.isInternal ? null : sub.href,
+                                                                onSelect: sub.isInternal ? () => setCurrentView(sub.view) : null
+                                                            };
+                                                        })
+                                                        .filter(Boolean);
+                                                }
+                                                if (s.modalId === 'biblioteca') {
+                                                    return BIBLIOTECA_CATEGORIAS.map(cat => ({
+                                                        id: cat.id,
+                                                        label: cat.label,
+                                                        href: null,
+                                                        onSelect: () => {
+                                                            setBibliotecaCategoria(cat.id);
+                                                            setBibliotecaModalOpen(true);
+                                                        }
+                                                    }));
+                                                }
+                                                return [];
+                                            })();
+                                            // Card de grupo: não é clicável em si, as pílulas é que levam a algum lugar.
+                                            const isGroup = subItems.length > 0;
+                                            const chipsLocked = isInert;
+
+                                            const isDropTarget = isAdmin
+                                                && dragOverBannerId === banner.id
+                                                && isDraggingBanners;
+
+                                            const cardClass = `mosaic-card mosaic-item mosaic-item--${size} ${darkMode ? 'is-dark' : ''
+                                                } ${isInert ? 'is-inert' : ''} ${isDisabledForUser ? 'is-muted' : ''
+                                                } ${isGroup ? 'is-group' : ''
+                                                } ${isDropTarget ? 'is-drop-target' : ''
+                                                } ${isAdmin ? 'is-admin cursor-pointer active:cursor-grabbing' : ''}`;
+                                            // --i alimenta o atraso escalonado da animação de entrada (teto em 11
+                                            // para a última fileira não demorar demais a aparecer).
+                                            // --sp-*/--rw-* são os spans resolvidos pelo empacotador; o CSS
+                                            // escolhe o par certo por media query.
+                                            const cardStyle = {
+                                                '--accent': accent,
+                                                '--i': Math.min(index, 11),
+                                                '--sp-lg': spanLg[index]?.[0] ?? 3,
+                                                '--rw-lg': spanLg[index]?.[1] ?? 1,
+                                                '--sp-md': spanMd[index]?.[0] ?? 3,
+                                                '--rw-md': spanMd[index]?.[1] ?? 1,
+                                                '--sp-sm': spanSm[index]?.[0] ?? 1,
+                                                '--rw-sm': spanSm[index]?.[1] ?? 1
+                                            };
 
                                             const content = (
                                                 <>
-                                                    {isAdmin && (
-                                                        <div className="absolute top-3 right-3 z-20 flex items-center gap-2" onClick={e => e.stopPropagation()}>
-                                                            <div className={`text-[9px] font-black uppercase tracking-tighter ${isFrozen ? (banner.freezeReason === 'construction' ? 'text-amber-500' : 'text-red-500 animate-pulse') : (darkMode ? 'text-green-400' : 'text-green-600')}`}>
-                                                                {isFrozen ? (banner.freezeReason === 'construction' ? 'EM OBRAS' : 'REVISÃO') : 'ATIVO'}
-                                                            </div>
-                                                            <button
-                                                                onClick={(e) => {
-                                                                    e.preventDefault();
-                                                                    e.stopPropagation();
-                                                                    if (isFrozen) {
-                                                                        handleFreezeToggleGlobal(banner);
-                                                                    } else {
-                                                                        setFreezeModalBanner(banner);
-                                                                    }
-                                                                }}
-                                                                className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${isFrozen ? (banner.freezeReason === 'construction' ? 'bg-amber-500' : 'bg-red-500') : (darkMode ? 'bg-gray-700' : 'bg-gray-200')}`}
-                                                                title={isFrozen ? "Descongelar serviço" : "Congelar serviço"}
-                                                            >
-                                                                <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${isFrozen ? 'translate-x-4' : 'translate-x-0'}`} />
-                                                            </button>
+                                                    <div className="mosaic-head">
+                                                        <div className={`mosaic-icon ${s.imageIcon ? 'mosaic-icon--img' : ''}`}>
+                                                            {s.imageIcon ? (
+                                                                <img src={s.imageIcon} alt="" loading="lazy" />
+                                                            ) : (
+                                                                <svg className={size === 'hero' ? 'w-7 h-7' : 'w-6 h-6'} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d={s.icon} />
+                                                                </svg>
+                                                            )}
                                                         </div>
-                                                    )}
-                                                    <div className={`absolute inset-0 opacity-0 ${'group-hover:opacity-10'} transition-opacity duration-300 ${darkMode ? s.hoverBg?.dark || 'bg-white' : s.hoverBg?.light || 'bg-blue-600'}`}></div>
-                                                    <div className={`w-12 h-12 md:h-14 md:w-14 rounded-full flex items-center justify-center mb-3 ${darkMode ? s.iconDark : s.iconLight} shadow-inner pointer-events-none overflow-hidden`}>
-                                                        {s.imageIcon ? (
-                                                            <img src={s.imageIcon} alt="" className={s.imageClass || 'w-full h-full object-cover'} />
-                                                        ) : (
-                                                            <svg className="w-6 h-6 md:w-7 md:h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={s.icon} />
-                                                            </svg>
+                                                        {!isAdmin && !isInert && !isGroup && (
+                                                            <span className="mosaic-arrow" aria-hidden="true">
+                                                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M17 8l4 4m0 0l-4 4m4-4H3" /></svg>
+                                                            </span>
+                                                        )}
+                                                        {isAdmin && (
+                                                            <div className="mosaic-admin" onClick={e => e.stopPropagation()}>
+                                                                <div className={`text-[9px] font-black uppercase tracking-tighter ${isFrozen ? (banner.freezeReason === 'construction' ? 'text-amber-500' : 'text-red-500 animate-pulse') : (darkMode ? 'text-green-400' : 'text-green-600')}`}>
+                                                                    {isFrozen ? (banner.freezeReason === 'construction' ? 'EM OBRAS' : 'REVISÃO') : 'ATIVO'}
+                                                                </div>
+                                                                <button
+                                                                    onClick={(e) => {
+                                                                        e.preventDefault();
+                                                                        e.stopPropagation();
+                                                                        if (isFrozen) {
+                                                                            handleFreezeToggleGlobal(banner);
+                                                                        } else {
+                                                                            setFreezeModalBanner(banner);
+                                                                        }
+                                                                    }}
+                                                                    className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${isFrozen ? (banner.freezeReason === 'construction' ? 'bg-amber-500' : 'bg-red-500') : (darkMode ? 'bg-gray-600' : 'bg-gray-300')}`}
+                                                                    title={isFrozen ? "Descongelar serviço" : "Congelar serviço"}
+                                                                >
+                                                                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${isFrozen ? 'translate-x-4' : 'translate-x-0'}`} />
+                                                                </button>
+                                                            </div>
                                                         )}
                                                     </div>
-                                                    <h3 className={`text-lg md:text-xl font-bold mb-1 text-center pointer-events-none ${darkMode ? 'text-white' : 'text-gray-900'}`}>{s.label || banner.label}</h3>
-                                                    {s.comingSoon && !isFrozen && (
-                                                        <div className="flex justify-center mb-2">
-                                                            <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold pointer-events-none ${darkMode ? 'bg-amber-500/10 text-amber-400' : 'bg-amber-50 text-amber-700 font-bold'}`}>
+
+                                                    <div className="mosaic-body">
+                                                        <h3 className="mosaic-title">{s.label || banner.label}</h3>
+                                                        <p className="mosaic-desc">{s.description}</p>
+
+                                                        {s.comingSoon && !isFrozen && (
+                                                            <span className={`mt-1.5 self-start inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold ${darkMode ? 'bg-amber-500/10 text-amber-400' : 'bg-amber-50 text-amber-700'}`}>
                                                                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" /></svg>
                                                                 Em Construção
                                                             </span>
-                                                        </div>
+                                                        )}
+
+                                                        {isGroup && (
+                                                            <div className="mosaic-chips">
+                                                                {subItems.map(item => {
+                                                                    if (chipsLocked) {
+                                                                        return <span key={item.id} className="mosaic-chip">{item.label}</span>;
+                                                                    }
+                                                                    const track = () => updateStatistics('bannerClick', {
+                                                                        bannerLabel: item.label,
+                                                                        user: currentUser ? currentUser.username : 'Visitante'
+                                                                    });
+                                                                    return item.href ? (
+                                                                        <a
+                                                                            key={item.id}
+                                                                            href={item.href}
+                                                                            target="_blank"
+                                                                            rel="noopener noreferrer"
+                                                                            className="mosaic-chip"
+                                                                            onClick={track}
+                                                                            /* Âncora é arrastável por padrão e sequestraria o
+                                                                               drag de reordenação do card no modo admin. */
+                                                                            draggable={false}
+                                                                        >
+                                                                            {item.label}
+                                                                        </a>
+                                                                    ) : (
+                                                                        <button
+                                                                            key={item.id}
+                                                                            type="button"
+                                                                            className="mosaic-chip"
+                                                                            onClick={() => { track(); item.onSelect(); }}
+                                                                        >
+                                                                            {item.label}
+                                                                        </button>
+                                                                    );
+                                                                })}
+                                                            </div>
+                                                        )}
+                                                    </div>
+
+                                                    {isAdmin && (
+                                                        <span className="mosaic-drag" aria-hidden="true">
+                                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" /></svg>
+                                                        </span>
                                                     )}
+
                                                     {isFrozen && !isAdmin && (
-                                                        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-gray-900/10 dark:bg-black/30 backdrop-blur-[2px] rounded-3xl animate-fadeIn">
-                                                            <div className={`px-4 py-2 rounded-xl shadow-lg border backdrop-blur-md flex items-center gap-2 ${banner.freezeReason === 'construction'
+                                                        <div className="mosaic-veil animate-fadeIn">
+                                                            <div className={`px-3.5 py-2 rounded-xl shadow-lg border backdrop-blur-md flex items-center gap-2 ${banner.freezeReason === 'construction'
                                                                 ? 'bg-amber-500/90 border-amber-400 text-white'
                                                                 : 'bg-red-500/90 border-red-400 text-white'
                                                                 }`}>
@@ -4089,36 +4332,10 @@ function App() {
                                                                 ) : (
                                                                     <svg className="w-5 h-5 animate-spin-slow" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
                                                                 )}
-                                                                <span className="font-bold text-sm tracking-wide">
+                                                                <span className="font-bold text-xs tracking-wide">
                                                                     {banner.freezeReason === 'construction' ? 'EM CONSTRUÇÃO' : 'EM MANUTENÇÃO'}
                                                                 </span>
                                                             </div>
-                                                        </div>
-                                                    )}
-                                                    <p className={`text-[10px] md:text-xs text-center leading-relaxed pointer-events-none ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>{s.description}</p>
-
-                                                    {/* Contador de Sub-banners */}
-                                                    {(() => {
-                                                        let count = 0;
-                                                        if (banner.key === 'dte') {
-                                                            count = DTE_SUB_BANNERS_KEYS.filter(k => bannerConfig.find(bc => bc.key === k)?.enabled !== false).length;
-                                                        } else if (banner.key === 'iss-cnae') {
-                                                            count = CONSULTAS_FISCAIS_SUB_BANNERS_KEYS.filter(k => bannerConfig.find(bc => bc.key === k)?.enabled !== false).length;
-                                                        }
-
-                                                        if (count > 0) {
-                                                            return (
-                                                                <div className={`mt-2 px-2.5 py-1 rounded-lg text-[10px] font-bold flex items-center gap-1.5 transition-all duration-300 ${darkMode ? 'bg-white/10 text-white border border-white/10' : 'bg-gray-100 text-gray-700 border border-gray-200'}`}>
-                                                                    <div className={`w-1.5 h-1.5 rounded-full animate-pulse ${darkMode ? 'bg-blue-400' : 'bg-blue-600'}`}></div>
-                                                                    {count} {count === 1 ? 'serviço disponível' : 'serviços disponíveis'}
-                                                                </div>
-                                                            );
-                                                        }
-                                                        return null;
-                                                    })()}
-                                                    {isAdmin && (
-                                                        <div className="absolute bottom-3 right-3 text-gray-400 opacity-0 group-hover:opacity-[0.8] transition-opacity cursor-grab active:cursor-grabbing pb-1 pr-1 pointer-events-none">
-                                                            <svg className="w-6 h-6 drop-shadow-md" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" /></svg>
                                                         </div>
                                                     )}
                                                 </>
@@ -4131,142 +4348,33 @@ function App() {
                                                     e.currentTarget.classList.add('opacity-50', 'scale-95');
                                                     setIsDraggingBanners(true); // Ativa injeção CSS global
                                                 },
-                                                onDragEnter: (e) => { dragOverItem.current = index; },
+                                                onDragEnter: (e) => {
+                                                    dragOverItem.current = index;
+                                                    // Com o empacotamento denso a posição visual não segue a
+                                                    // ordem do array, então o alvo do drop precisa ser explícito.
+                                                    setDragOverBannerId(banner.id);
+                                                },
                                                 onDragEnd: (e) => {
                                                     e.currentTarget.classList.remove('opacity-50', 'scale-95');
                                                     setIsDraggingBanners(false); // Desativa injeção CSS global
+                                                    setDragOverBannerId(null);
                                                     handleSortBanners();
                                                 },
                                                 onDragOver: (e) => e.preventDefault()
                                             } : {};
 
-                                            if (s.isModal) {
+                                            // Card de grupo: é contêiner, não link. Quem leva a algum lugar
+                                            // são as pílulas de subserviço — o painel expansível foi removido.
+                                            if (s.isModal || isGroup) {
                                                 return (
-                                                    <React.Fragment key={banner.id}>
-                                                        <button
-                                                            onClick={(e) => {
-                                                                if (isEffectivelyFrozen) {
-                                                                    e.preventDefault();
-                                                                    const isConstruction = s.label.toLowerCase().includes('biblioteca') || s.description?.toLowerCase().includes('construção');
-                                                                    const msg = isConstruction
-                                                                        ? 'Este acesso está em desenvolvimento (EM CONSTRUÇÃO). Em breve disponível.'
-                                                                        : 'Este acesso está temporariamente indisponível. Em manutenção.';
-                                                                    alert(msg);
-                                                                    return;
-                                                                }
-                                                                if (!isDisabledForUser) {
-                                                                    // Toggle do Accordion
-                                                                    if (expandedBanner === banner.id) {
-                                                                        setExpandedBanner(null);
-                                                                    } else {
-                                                                        setExpandedBanner(banner.id);
-                                                                        updateStatistics('bannerExpand', {
-                                                                            bannerLabel: s.label || banner.label,
-                                                                            user: currentUser ? currentUser.username : 'Visitante'
-                                                                        });
-                                                                    }
-                                                                }
-                                                            }}
-                                                            disabled={isDisabledForUser}
-                                                            className={cardClass}
-                                                            {...dragProps}
-                                                        >
-                                                            {content}
-                                                        </button>
-
-                                                        {/* Accordion Content */}
-                                                        {expandedBanner === banner.id && (
-                                                            <div className="col-span-full animate-fadeInDown mt-2 mb-6">
-                                                                <div className={`p-6 rounded-3xl border-2 ${darkMode ? 'bg-gray-800/40 border-gray-700/50' : 'bg-white border-gray-100'} shadow-xl backdrop-blur-sm relative overflow-hidden`}>
-                                                                    {/* Header do Accordion */}
-                                                                    <div className="flex items-center justify-between mb-6">
-                                                                        <div className="flex items-center gap-3">
-                                                                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${darkMode ? s.iconDark : s.iconLight}`}>
-                                                                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={s.icon} /></svg>
-                                                                            </div>
-                                                                            <div>
-                                                                                <h4 className={`font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>{s.label}</h4>
-                                                                                <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Selecione o serviço desejado</p>
-                                                                            </div>
-                                                                        </div>
-                                                                        <button onClick={() => setExpandedBanner(null)} className={`p-2 rounded-lg transition-colors ${darkMode ? 'hover:bg-gray-700 text-gray-400' : 'hover:bg-gray-100 text-gray-500'}`}>
-                                                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                                                                        </button>
-                                                                    </div>
-
-                                                                    {/* Grid de Sub-banners */}
-                                                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                                                                        {(() => {
-                                                                            let subKeys = [];
-                                                                            if (s.modalId === 'dte') subKeys = DTE_SUB_BANNERS_KEYS;
-                                                                            else if (s.modalId === 'consultas-fiscais') subKeys = CONSULTAS_FISCAIS_SUB_BANNERS_KEYS;
-
-                                                                            if (subKeys.length > 0) {
-                                                                                return subKeys.map(key => {
-                                                                                    const sub = BANNER_STATIC[key];
-                                                                                    const cfg = bannerConfig.find(bc => bc.key === key);
-                                                                                    const isSubEnabled = cfg?.enabled !== false;
-
-                                                                                    if (!isSubEnabled && currentUser?.role !== 'admin') return null;
-
-                                                                                    return (
-                                                                                        <a
-                                                                                            key={key}
-                                                                                            href={sub.href || '#'}
-                                                                                            target={sub.href ? '_blank' : '_self'}
-                                                                                            rel="noopener noreferrer"
-                                                                                            onClick={(e) => {
-                                                                                                if (sub.isInternal) {
-                                                                                                    e.preventDefault();
-                                                                                                    setCurrentView(sub.view);
-                                                                                                    setExpandedBanner(null);
-                                                                                                }
-                                                                                                updateStatistics('bannerClick', { bannerLabel: sub.label, user: currentUser?.username || 'Visitante' });
-                                                                                            }}
-                                                                                            className={`flex items-center gap-3 p-3 rounded-2xl border transition-all hover:-translate-y-1 hover:shadow-lg ${darkMode ? `bg-gradient-to-br ${sub.dark} border-gray-700/50 hover:border-blue-500/50` : `bg-gradient-to-br ${sub.light} border-gray-100 hover:border-blue-300`} ${!isSubEnabled ? 'opacity-40 grayscale' : ''}`}
-                                                                                        >
-                                                                                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${darkMode ? sub.iconDark : sub.iconLight}`}>
-                                                                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={sub.icon} /></svg>
-                                                                                            </div>
-                                                                                            <div className="min-w-0">
-                                                                                                <p className={`text-xs font-bold truncate ${darkMode ? 'text-white' : 'text-gray-900'}`}>{sub.label}</p>
-                                                                                                <p className={`text-[10px] truncate ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{sub.description}</p>
-                                                                                            </div>
-                                                                                        </a>
-                                                                                    );
-                                                                                });
-                                                                            }
-
-                                                                            // Especial para Biblioteca
-                                                                            if (s.modalId === 'biblioteca') {
-                                                                                return BIBLIOTECA_CATEGORIAS.map(cat => (
-                                                                                    <button
-                                                                                        key={cat.id}
-                                                                                        onClick={() => {
-                                                                                            setBibliotecaCategoria(cat.id);
-                                                                                            setBibliotecaModalOpen(true);
-                                                                                            setExpandedBanner(null);
-                                                                                        }}
-                                                                                        className={`flex items-center gap-3 p-3 rounded-2xl border transition-all hover:-translate-y-1 hover:shadow-lg text-left ${darkMode ? `bg-gradient-to-br ${cat.colorDark} border-gray-700/50` : `bg-gradient-to-br ${cat.colorLight} border-gray-100`}`}
-                                                                                    >
-                                                                                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${darkMode ? cat.iconDark : cat.iconLight}`}>
-                                                                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={cat.icon} /></svg>
-                                                                                        </div>
-                                                                                        <div className="min-w-0">
-                                                                                            <p className={`text-xs font-bold truncate ${darkMode ? 'text-white' : 'text-gray-900'}`}>{cat.label}</p>
-                                                                                            <p className={`text-[10px] truncate ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{cat.description}</p>
-                                                                                        </div>
-                                                                                    </button>
-                                                                                ));
-                                                                            }
-
-                                                                            return null;
-                                                                        })()}
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        )}
-                                                    </React.Fragment>
+                                                    <div
+                                                        key={banner.id}
+                                                        className={cardClass}
+                                                        style={cardStyle}
+                                                        {...dragProps}
+                                                    >
+                                                        {content}
+                                                    </div>
                                                 );
                                             }
                                             if (s.isInternal) {
@@ -4289,6 +4397,7 @@ function App() {
                                                         }}
                                                         disabled={isDisabledForUser}
                                                         className={cardClass}
+                                                        style={cardStyle}
                                                         {...dragProps}
                                                     >
                                                         {content}
@@ -4302,6 +4411,7 @@ function App() {
                                                     target={(isDisabledForUser || s.comingSoon || isEffectivelyFrozen) ? undefined : '_blank'}
                                                     rel="noopener noreferrer"
                                                     className={cardClass}
+                                                    style={cardStyle}
                                                     onClick={(e) => {
                                                         if (isEffectivelyFrozen) {
                                                             e.preventDefault();
@@ -4323,7 +4433,8 @@ function App() {
                                         })}
                                 </div>
                             </div>
-                        )}
+                            );
+                        })()}
 
                         {(currentView === 'outros' || currentView === 'other-services') && (
                             <div className="animate-fadeInUp space-y-8">
@@ -5021,170 +5132,6 @@ function App() {
                                                 </div>
                                             )}
                                         </div>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Modal Sub-Banners — Prefeitura Moderna */}
-                        {dteModalOpen && (
-                            <div
-                                className="fixed inset-0 z-50 flex items-center justify-center p-4"
-                                style={{ backgroundColor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}
-                                onClick={() => setDteModalOpen(false)}
-                            >
-                                <div
-                                    className={`relative w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden animate-fadeInUp ${darkMode ? 'bg-gray-900 border border-gray-700' : 'bg-white border border-gray-200'}`}
-                                    onClick={e => e.stopPropagation()}
-                                >
-                                    {/* Header */}
-                                    <div className={`flex items-center justify-between px-6 py-5 border-b ${darkMode ? 'border-gray-700/60 bg-gradient-to-r from-rose-900/40 to-pink-900/40' : 'border-rose-100 bg-gradient-to-r from-rose-50 to-pink-50'}`}>
-                                        <div className="flex items-center gap-3">
-                                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center overflow-hidden ${darkMode ? 'bg-rose-500/20' : 'bg-white shadow-sm'}`}>
-                                                <img src="image/bauhaus.png" className="w-8 h-8 rounded-full object-cover" alt="Prefeitura Moderna" />
-                                            </div>
-                                            <div>
-                                                <h2 className={`text-lg font-bold leading-tight ${darkMode ? 'text-white' : 'text-gray-900'}`}>Prefeitura Moderna</h2>
-                                                <p className={`text-xs ${darkMode ? 'text-rose-300/70' : 'text-rose-500'}`}>Selecione o serviço desejado</p>
-                                            </div>
-                                        </div>
-                                        <button
-                                            onClick={() => setDteModalOpen(false)}
-                                            className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${darkMode ? 'text-gray-400 hover:bg-gray-700 hover:text-white' : 'text-gray-500 hover:bg-white/80 hover:text-gray-900'}`}
-                                        >
-                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                                        </button>
-                                    </div>
-                                    <div className="p-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                        {DTE_SUB_BANNERS_KEYS.map(key => {
-                                            const sub = BANNER_STATIC[key];
-                                            const config = bannerConfig.find(b => b.key === key);
-                                            const isEnabled = config ? config.enabled : !sub.adminOnly;
-                                            const isAdmin = currentUser?.role === 'admin';
-
-                                            if (!isEnabled && !isAdmin) return null;
-
-                                            const isPlaceholder = sub.href === '#';
-                                            return (
-                                                <a
-                                                    key={key}
-                                                    href={isPlaceholder ? undefined : sub.href}
-                                                    target={isPlaceholder ? undefined : '_blank'}
-                                                    rel="noopener noreferrer"
-                                                    onClick={isPlaceholder ? e => e.preventDefault() : (e) => {
-                                                        updateStatistics('banner_clicked', {
-                                                            bannerKey: key,
-                                                            bannerLabel: sub.label,
-                                                            user: currentUser?.username || 'unknown',
-                                                            menu: 'dte-sub'
-                                                        });
-                                                    }}
-                                                    className={`group flex items-start gap-4 p-4 rounded-xl border bg-gradient-to-br transition-all duration-200 ${isPlaceholder ? 'opacity-50 cursor-not-allowed pointer-events-none' : 'cursor-pointer'} ${darkMode ? sub.dark : sub.light}`}
-                                                >
-                                                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 transition-transform duration-200 group-hover:scale-110 ${darkMode ? sub.iconDark : sub.iconLight}`}>
-                                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={sub.icon} /></svg>
-                                                    </div>
-                                                    <div className="flex-1 min-w-0">
-                                                        <div className="flex items-center justify-between gap-2">
-                                                            <div className="flex items-center gap-2 min-w-0">
-                                                                <span className={`text-sm font-bold truncate ${darkMode ? 'text-white' : 'text-gray-900'}`}>{sub.label}</span>
-                                                            </div>
-                                                            {!isPlaceholder && (
-                                                                <svg className={`w-4 h-4 flex-shrink-0 opacity-50 group-hover:opacity-100 transition-opacity ${darkMode ? 'text-gray-400' : 'text-gray-500'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
-                                                            )}
-                                                        </div>
-                                                        <p className={`text-xs mt-0.5 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{sub.description}</p>
-                                                    </div>
-                                                </a>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Modal Sub-Banners — Consultas Fiscais */}
-                        {consultasModalOpen && (
-                            <div
-                                className="fixed inset-0 z-50 flex items-center justify-center p-4"
-                                style={{ backgroundColor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}
-                                onClick={() => setConsultasModalOpen(false)}
-                            >
-                                <div
-                                    className={`relative w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden animate-fadeInUp ${darkMode ? 'bg-gray-900 border border-gray-700' : 'bg-white border border-gray-200'}`}
-                                    onClick={e => e.stopPropagation()}
-                                >
-                                    <div className={`flex items-center justify-between px-6 py-5 border-b ${darkMode ? 'border-gray-700/60 bg-gradient-to-r from-blue-900/40 to-purple-900/40' : 'border-blue-100 bg-gradient-to-r from-blue-50 to-purple-50'}`}>
-                                        <div className="flex items-center gap-3">
-                                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center overflow-hidden ${darkMode ? 'bg-blue-500/20 text-blue-400' : 'bg-white text-blue-600 shadow-sm'}`}>
-                                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-                                            </div>
-                                            <div>
-                                                <h2 className={`text-lg font-bold leading-tight ${darkMode ? 'text-white' : 'text-gray-900'}`}>Consultas Fiscais</h2>
-                                                <p className={`text-xs ${darkMode ? 'text-blue-300/70' : 'text-blue-600'}`}>Selecione o serviço de consulta desejado</p>
-                                            </div>
-                                        </div>
-                                        <button
-                                            onClick={() => setConsultasModalOpen(false)}
-                                            className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${darkMode ? 'text-gray-400 hover:bg-gray-700 hover:text-white' : 'text-gray-500 hover:bg-white/80 hover:text-gray-900'}`}
-                                        >
-                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                                        </button>
-                                    </div>
-                                    <div className="p-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                        {CONSULTAS_FISCAIS_SUB_BANNERS_KEYS.map(key => {
-                                            const sub = BANNER_STATIC[key];
-                                            const config = bannerConfig.find(b => b.key === key);
-                                            const isEnabled = config ? config.enabled : !sub.adminOnly;
-                                            const isAdmin = currentUser?.role === 'admin';
-
-                                            if (!isEnabled && !isAdmin) return null;
-
-                                            const isPlaceholder = sub.href && sub.href === '#';
-                                            const clickHandler = (e) => {
-                                                if (isPlaceholder) {
-                                                    e.preventDefault();
-                                                    return;
-                                                }
-                                                // Log access
-                                                updateStatistics('banner_clicked', {
-                                                    bannerKey: key,
-                                                    bannerLabel: sub.label,
-                                                    user: currentUser?.username || 'unknown',
-                                                    menu: 'consultas-sub'
-                                                });
-                                                if (sub.isInternal) {
-                                                    e.preventDefault();
-                                                    setConsultasModalOpen(false);
-                                                    setCurrentView(sub.view);
-                                                }
-                                            };
-                                            return (
-                                                <a
-                                                    key={key}
-                                                    href={sub.isInternal ? '#' : (isPlaceholder ? undefined : sub.href)}
-                                                    target={sub.isInternal || isPlaceholder ? undefined : '_blank'}
-                                                    rel="noopener noreferrer"
-                                                    onClick={clickHandler}
-                                                    className={`group flex items-start gap-4 p-4 rounded-xl border bg-gradient-to-br transition-all duration-200 ${isPlaceholder ? 'opacity-50 cursor-not-allowed pointer-events-none' : 'cursor-pointer'} ${darkMode ? sub.dark : sub.light}`}
-                                                >
-                                                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 transition-transform duration-200 group-hover:scale-110 ${darkMode ? sub.iconDark : sub.iconLight}`}>
-                                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={sub.icon} /></svg>
-                                                    </div>
-                                                    <div className="flex-1 min-w-0">
-                                                        <div className="flex items-center justify-between gap-2">
-                                                            <div className="flex items-center gap-2 min-w-0">
-                                                                <span className={`text-sm font-bold truncate ${darkMode ? 'text-white' : 'text-gray-900'}`}>{sub.label}</span>
-                                                            </div>
-                                                            {!isPlaceholder && !sub.isInternal && (
-                                                                <svg className={`w-4 h-4 flex-shrink-0 opacity-50 group-hover:opacity-100 transition-opacity ${darkMode ? 'text-gray-400' : 'text-gray-500'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
-                                                            )}
-                                                        </div>
-                                                        <p className={`text-xs mt-0.5 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{sub.description}</p>
-                                                    </div>
-                                                </a>
-                                            );
-                                        })}
                                     </div>
                                 </div>
                             </div>
