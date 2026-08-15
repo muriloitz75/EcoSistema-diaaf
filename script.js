@@ -2154,6 +2154,251 @@ function mosaicSolve(sizes, cols, capH = 3, maxPass = 8) {
     return boxes;
 }
 
+// ==================== CENTRAL DE AUDITORIA: VISUALIZAÇÃO ====================
+// Paleta validada com scripts/validate_palette.js contra as superfícies REAIS
+// dos cards deste projeto (#fbfcfd claro / #131b28 escuro), não contra as do
+// arquivo de referência. Slots categóricos azul+laranja passam em todos os
+// gates nos dois temas (CVD ΔE 24,7 claro / 26,8 escuro).
+//
+// Decisão de encoding: sucesso e falha NÃO são codificados por cor em gráfico.
+// O validador reprovou o par status good↔critical em ΔE 4,1 sob deuteranopia —
+// é a armadilha verde/vermelho. As séries são de identidade (azul/laranja) e as
+// cores de status aparecem só onde há ícone + rótulo junto, nunca sozinhas.
+const VIZ = {
+    light: {
+        surface: '#fbfcfd',
+        s1: '#2a78d6',          // slot categórico 1 — azul
+        s2: '#eb6834',          // slot categórico 2 — laranja
+        grid: '#e1e0d9',
+        axis: '#c3c2b7',
+        ink: '#0f172a',
+        muted: '#55637a',
+        // rampa sequencial azul, clara→escura (monotônica, verificada)
+        ramp: ['#eef4fd', '#cde2fb', '#9ec5f4', '#6da7ec', '#3987e5', '#2a78d6', '#184f95'],
+        good: '#0ca30c', warning: '#fab219', critical: '#d03b3b'
+    },
+    dark: {
+        surface: '#131b28',
+        s1: '#3987e5',
+        s2: '#d95926',
+        grid: '#2c3444',
+        axis: '#3c465a',
+        ink: '#f8fafc',
+        muted: '#a3b0c4',
+        // no tema escuro o "quase zero" recua para a superfície: rampa escura→clara
+        ramp: ['#1b2434', '#123055', '#184f95', '#256abf', '#3987e5', '#6da7ec', '#9ec5f4'],
+        good: '#0ca30c', warning: '#fab219', critical: '#d03b3b'
+    }
+};
+
+const vizPal = (darkMode) => darkMode ? VIZ.dark : VIZ.light;
+
+// --- Derivações sobre o histórico de auditoria ---
+const AUDIT_RANGES = [
+    { id: '24h', label: '24 h', horas: 24, buckets: 24, passo: 'hora' },
+    { id: '7d', label: '7 dias', horas: 24 * 7, buckets: 7, passo: 'dia' },
+    { id: '30d', label: '30 dias', horas: 24 * 30, buckets: 30, passo: 'dia' },
+    { id: 'all', label: 'Tudo', horas: null, buckets: 30, passo: 'dia' }
+];
+
+const ehFalha = (e) => e?.success === false || /fail/i.test(e?.action || '');
+const ehLogin = (e) => e?.action === 'login_success';
+const ehServico = (e) => e?.action === 'banner_clicked' || e?.type === 'banner';
+
+function janelaAuditoria(eventos, rangeId, agora = Date.now()) {
+    const r = AUDIT_RANGES.find(x => x.id === rangeId) || AUDIT_RANGES[1];
+    if (!r.horas) return { inicio: 0, fim: agora, range: r };
+    const ms = r.horas * 3600 * 1000;
+    return { inicio: agora - ms, fim: agora, range: r };
+}
+
+function agrupaPorTempo(eventos, rangeId, agora = Date.now()) {
+    const { inicio, fim, range } = janelaAuditoria(eventos, rangeId, agora);
+    const base = range.horas ? inicio : (eventos.length
+        ? Math.min(...eventos.map(e => new Date(e.timestamp).getTime()))
+        : agora - 30 * 24 * 3600 * 1000);
+    const largura = Math.max(1, (fim - base) / range.buckets);
+    const bins = Array.from({ length: range.buckets }, (_, i) => ({
+        t0: base + i * largura, t1: base + (i + 1) * largura, total: 0, falhas: 0
+    }));
+    eventos.forEach(e => {
+        const t = new Date(e.timestamp).getTime();
+        if (isNaN(t) || t < base || t > fim) return;
+        const i = Math.min(bins.length - 1, Math.floor((t - base) / largura));
+        bins[i].total++;
+        if (ehFalha(e)) bins[i].falhas++;
+    });
+    return { bins, passo: range.passo };
+}
+
+// Mapa dia-da-semana × hora: revela janelas de uso e acesso fora de expediente.
+function mapaCalor(eventos) {
+    const grade = Array.from({ length: 7 }, () => new Array(24).fill(0));
+    eventos.forEach(e => {
+        const d = new Date(e.timestamp);
+        if (isNaN(d.getTime())) return;
+        grade[d.getDay()][d.getHours()]++;
+    });
+    return grade;
+}
+
+function ranking(eventos, chave, limite = 6) {
+    const acc = {};
+    eventos.forEach(e => {
+        const k = typeof chave === 'function' ? chave(e) : e[chave];
+        if (!k) return;
+        acc[k] = (acc[k] || 0) + 1;
+    });
+    return Object.entries(acc).sort((a, b) => b[1] - a[1]).slice(0, limite);
+}
+
+const compacto = (n) => n >= 1e6 ? (n / 1e6).toFixed(1).replace('.0', '') + 'M'
+    : n >= 1e4 ? (n / 1e3).toFixed(1).replace('.0', '') + 'K'
+        : String(n);
+
+// --- Componentes de gráfico (SVG inline; sem biblioteca externa) ---
+
+// Sparkline do stat tile: 12 pontos, traço fino, sem eixos. Contexto, não leitura.
+function VizSparkline({ pontos, cor, largura = 108, altura = 30 }) {
+    if (!pontos || pontos.length < 2) return null;
+    const max = Math.max(...pontos, 1);
+    const passo = largura / (pontos.length - 1);
+    const y = v => altura - 2 - (v / max) * (altura - 4);
+    const d = pontos.map((v, i) => `${i ? 'L' : 'M'}${(i * passo).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
+    const area = `${d} L${largura},${altura} L0,${altura} Z`;
+    return (
+        <svg className="viz-spark" viewBox={`0 0 ${largura} ${altura}`} width={largura} height={altura} aria-hidden="true">
+            <path d={area} fill={cor} opacity="0.1" />
+            <path d={d} fill="none" stroke={cor} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
+            <circle cx={largura} cy={y(pontos[pontos.length - 1])} r="3" fill={cor} />
+        </svg>
+    );
+}
+
+function VizStatTile({ rotulo, valor, delta, serie, cor, nota, statusIcone, statusCor }) {
+    const sinal = delta > 0 ? '+' : '';
+    return (
+        <div className="viz-tile">
+            <p className="viz-tile-label">{rotulo}</p>
+            <div className="viz-tile-row">
+                <span className="viz-tile-value" style={statusCor ? { color: statusCor } : undefined}>
+                    {statusIcone}{compacto(valor)}
+                </span>
+                {serie && <VizSparkline pontos={serie} cor={cor} />}
+            </div>
+            <p className="viz-tile-foot">
+                {delta !== null && delta !== undefined && (
+                    <span className="viz-delta" style={{ color: cor }}>{sinal}{delta}%</span>
+                )}
+                {nota}
+            </p>
+        </div>
+    );
+}
+
+// Colunas de atividade. Série ÚNICA — por isso sem legenda: o título já diz o
+// que está plotado. Rótulo direto só no pico (nunca um número por coluna).
+function VizTimeline({ bins, passo, pal }) {
+    const W = 720, H = 200, padL = 38, padR = 10, padT = 16, padB = 26;
+    const max = Math.max(1, ...bins.map(b => b.total));
+    const banda = (W - padL - padR) / bins.length;
+    const largura = Math.min(24, banda - 4);
+    const y = v => padT + (1 - v / max) * (H - padT - padB);
+    const ticks = [0, Math.round(max / 2), max].filter((v, i, a) => a.indexOf(v) === i);
+    const iPico = bins.reduce((m, b, i) => b.total > bins[m].total ? i : m, 0);
+    const rotuloData = (t) => {
+        const d = new Date(t);
+        return passo === 'hora'
+            ? String(d.getHours()).padStart(2, '0') + 'h'
+            : d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+    };
+
+    return (
+        <svg className="viz-svg" viewBox={`0 0 ${W} ${H}`} role="img"
+            aria-label={`Atividade por ${passo}. Pico de ${bins[iPico].total} eventos.`}>
+            {ticks.map(t => (
+                <g key={t}>
+                    <line x1={padL} x2={W - padR} y1={y(t)} y2={y(t)} stroke={pal.grid} strokeWidth="1" />
+                    <text x={padL - 8} y={y(t) + 4} textAnchor="end" className="viz-tick" fill={pal.muted}>{t}</text>
+                </g>
+            ))}
+            {bins.map((b, i) => {
+                const x = padL + i * banda + (banda - largura) / 2;
+                const h = Math.max(b.total > 0 ? 2 : 0, (H - padT - padB) * (b.total / max));
+                return (
+                    <g key={i} className="viz-col">
+                        <rect x={padL + i * banda} y={padT} width={banda} height={H - padT - padB} fill="transparent" />
+                        <rect x={x} y={y(b.total)} width={largura} height={h} rx="4"
+                            fill={i === iPico ? pal.s1 : pal.s1} opacity={i === iPico ? 1 : 0.55} />
+                        <title>{`${rotuloData(b.t0)} — ${b.total} evento${b.total === 1 ? '' : 's'}${b.falhas ? `, ${b.falhas} com falha` : ''}`}</title>
+                    </g>
+                );
+            })}
+            {/* rótulo direto apenas no pico */}
+            <text x={padL + iPico * banda + banda / 2} y={y(bins[iPico].total) - 6}
+                textAnchor="middle" className="viz-peak" fill={pal.ink}>{bins[iPico].total}</text>
+            <line x1={padL} x2={W - padR} y1={H - padB} y2={H - padB} stroke={pal.axis} strokeWidth="1" />
+            {bins.map((b, i) => (i % Math.ceil(bins.length / 8) === 0) && (
+                <text key={i} x={padL + i * banda + banda / 2} y={H - padB + 16}
+                    textAnchor="middle" className="viz-tick" fill={pal.muted}>{rotuloData(b.t0)}</text>
+            ))}
+        </svg>
+    );
+}
+
+// Mapa de calor dia × hora. Magnitude → rampa de UM matiz (nunca arco-íris).
+function VizHeatmap({ grade, pal }) {
+    const dias = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+    const max = Math.max(1, ...grade.flat());
+    const cor = v => v === 0 ? 'transparent' : pal.ramp[Math.min(pal.ramp.length - 1, Math.ceil((v / max) * (pal.ramp.length - 1)))];
+    return (
+        <div className="viz-heat">
+            <div className="viz-heat-grid">
+                {grade.map((linha, d) => (
+                    <React.Fragment key={d}>
+                        <span className="viz-heat-day">{dias[d]}</span>
+                        {linha.map((v, h) => (
+                            <span key={h} className="viz-heat-cell"
+                                style={{ backgroundColor: cor(v), borderColor: v === 0 ? pal.grid : 'transparent' }}
+                                title={`${dias[d]}, ${String(h).padStart(2, '0')}h — ${v} evento${v === 1 ? '' : 's'}`} />
+                        ))}
+                    </React.Fragment>
+                ))}
+                <span></span>
+                {Array.from({ length: 24 }, (_, h) => (
+                    <span key={h} className="viz-heat-hour">{h % 6 === 0 ? String(h).padStart(2, '0') : ''}</span>
+                ))}
+            </div>
+            <div className="viz-scale">
+                <span className="viz-tick-txt">0</span>
+                {pal.ramp.map((c, i) => <span key={i} className="viz-scale-step" style={{ backgroundColor: c }} />)}
+                <span className="viz-tick-txt">{max}</span>
+            </div>
+        </div>
+    );
+}
+
+// Barras de ranking. Categorias nominais → UMA cor para todas as barras (uma
+// rampa por valor duplicaria o comprimento em matiz). Valor rotulado na ponta,
+// então nenhum número fica preso ao tooltip.
+function VizRankBars({ dados, cor, pal, vazio }) {
+    if (!dados.length) return <p className="viz-empty">{vazio}</p>;
+    const max = Math.max(...dados.map(d => d[1]));
+    return (
+        <ul className="viz-rank">
+            {dados.map(([nome, valor]) => (
+                <li key={nome} className="viz-rank-row">
+                    <span className="viz-rank-name" title={nome}>{nome}</span>
+                    <span className="viz-rank-track" style={{ backgroundColor: pal.grid }}>
+                        <span className="viz-rank-fill" style={{ width: `${(valor / max) * 100}%`, backgroundColor: cor }} />
+                    </span>
+                    <span className="viz-rank-val">{valor}</span>
+                </li>
+            ))}
+        </ul>
+    );
+}
+
 // ==================== PAINEL DE CONTROLE DE BANNERS ====================
 // Paleta de acentos do mosaico. A cor entra apenas como identidade do serviço
 // (ícone, halo e foco) — a superfície do card permanece neutra.
@@ -3038,6 +3283,7 @@ function App() {
     const [adminUsersListKey, setAdminUsersListKey] = useState(0);
     const [auditUserFilter, setAuditUserFilter] = useState('');
     const [auditTypeFilter, setAuditTypeFilter] = useState(''); // 'banner', 'login_failure', etc.
+    const [auditRange, setAuditRange] = useState('7d'); // janela temporal da Central de Auditoria
     const [bibliotecaModalOpen, setBibliotecaModalOpen] = useState(false);
     const [bibliotecaCategoria, setBibliotecaCategoria] = useState(null);
     const [bibliotecaSearch, setBibliotecaSearch] = useState('');
@@ -4711,327 +4957,289 @@ function App() {
 
 
                         {/* Painel de Auditoria */}
-                        {currentUser?.role === 'admin' && currentView === 'admin-dashboard' && (
-                            <div className="animate-fadeInUp space-y-6">
-                                {/* Header */}
-                                <div className={`flex flex-col md:flex-row md:items-center justify-between gap-4 p-6 rounded-2xl ${darkMode ? 'bg-gray-800/80 border border-gray-700/50' : 'bg-white border border-gray-100'} shadow-sm`}>
-                                    <div>
-                                        <div className="flex items-center gap-3 mb-1">
-                                            <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${darkMode ? 'bg-blue-500/20 text-blue-400' : 'bg-blue-50 text-blue-600'}`}>
-                                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
-                                            </div>
-                                            <h2 className={`text-2xl font-bold tracking-tight ${darkMode ? 'text-white' : 'text-gray-900'}`}>Central de Auditoria</h2>
-                                        </div>
-                                        <p className={`text-sm mb-2 ml-12 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Monitoramento de acessos à aplicação e utilização dos banners de serviço.</p>
-                                        <div className="flex items-center gap-2 ml-12">
-                                            <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${darkMode ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 'bg-green-50 text-green-700 border border-green-200'}`}>
-                                                <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
-                                                Monitoramento Ativo
-                                            </div>
-                                            <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-600'}`}>
-                                                {(statistics?.searchHistory || []).length} eventos totais registrados
-                                            </span>
+                        {currentUser?.role === 'admin' && currentView === 'admin-dashboard' && (() => {
+                            const pal = vizPal(darkMode);
+                            const todos = statistics?.searchHistory || [];
+                            const agora = Date.now();
+                            const { inicio, range } = janelaAuditoria(todos, auditRange, agora);
+
+                            // Uma única fatia alimenta TODOS os gráficos — a barra de filtros
+                            // fica acima de tudo que ela escopa, nunca dentro de um card.
+                            const naJanela = todos.filter(e => {
+                                const t = new Date(e.timestamp).getTime();
+                                return !isNaN(t) && t >= inicio && t <= agora;
+                            });
+                            const fatia = naJanela
+                                .filter(e => auditUserFilter === '' || e.user === auditUserFilter)
+                                .filter(e => {
+                                    if (auditTypeFilter === '') return true;
+                                    if (auditTypeFilter === 'banner') return ehServico(e);
+                                    if (auditTypeFilter === 'login_failure') return ehFalha(e);
+                                    if (auditTypeFilter === 'login') return ehLogin(e);
+                                    if (auditTypeFilter === 'admin') return /^admin_|user_/.test(e.action || '');
+                                    return true;
+                                });
+
+                            // Janela anterior de mesmo tamanho, para o delta dos tiles.
+                            const largura = range.horas ? range.horas * 3600 * 1000 : null;
+                            const anterior = largura
+                                ? todos.filter(e => {
+                                    const t = new Date(e.timestamp).getTime();
+                                    return !isNaN(t) && t >= inicio - largura && t < inicio;
+                                })
+                                : [];
+                            const pct = (atual, antes) => {
+                                if (!largura) return null;
+                                if (antes === 0) return atual === 0 ? 0 : 100;
+                                return Math.round(((atual - antes) / antes) * 100);
+                            };
+
+                            const sessoes = fatia.filter(ehLogin).length;
+                            const servicos = fatia.filter(ehServico).length;
+                            const falhas = fatia.filter(ehFalha).length;
+                            const ativos = new Set(fatia.map(e => e.user).filter(Boolean)).size;
+                            const ips = new Set(fatia.map(e => e.ipAddress).filter(Boolean)).size;
+
+                            const { bins, passo } = agrupaPorTempo(fatia, auditRange, agora);
+                            const serie = bins.map(b => b.total);
+                            const grade = mapaCalor(fatia);
+                            const topServicos = ranking(fatia.filter(ehServico), e => e.bannerLabel);
+                            const topUsuarios = ranking(fatia, e => e.user || 'Visitante');
+
+                            // Sinais de segurança: 3+ falhas por origem na janela.
+                            const grupos = {};
+                            fatia.filter(ehFalha).forEach(e => {
+                                const k = e.user || e.ipAddress || 'origem desconhecida';
+                                (grupos[k] = grupos[k] || []).push(e);
+                            });
+                            const sinais = Object.entries(grupos)
+                                .filter(([, itens]) => itens.length >= 3)
+                                .map(([k, itens]) => ({
+                                    origem: k,
+                                    n: itens.length,
+                                    nivel: itens.length >= 5 ? 'critical' : 'warning'
+                                }))
+                                .sort((a, b) => b.n - a.n);
+
+                            const exportarCSV = () => {
+                                if (!fatia.length) { alert('Nenhum evento na janela selecionada para exportar.'); return; }
+                                const linhas = [['Timestamp', 'Usuario', 'Acao', 'Sucesso', 'IP', 'Detalhe']];
+                                fatia.forEach(e => linhas.push([
+                                    new Date(e.timestamp).toLocaleString('pt-BR'),
+                                    e.user || 'Visitante',
+                                    e.action || e.type || '-',
+                                    ehFalha(e) ? 'Nao' : 'Sim',
+                                    e.ipAddress || '-',
+                                    e.bannerLabel || e.details?.reason || ''
+                                ]));
+                                const csv = linhas.map(r => r.map(v => '"' + String(v).replace(/"/g, '""') + '"').join(',')).join('\n');
+                                const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+                                const url = URL.createObjectURL(blob);
+                                const a = document.createElement('a');
+                                a.href = url;
+                                a.download = 'auditoria_' + auditRange + '_' + new Date().toISOString().split('T')[0] + '.csv';
+                                a.click();
+                                URL.revokeObjectURL(url);
+                            };
+
+                            return (
+                            <div className={`viz-page hud ${darkMode ? 'is-dark' : ''} animate-fadeInUp`}>
+                                {/* Cabeçalho */}
+                                <header className="viz-head">
+                                    <div className="viz-head-id">
+                                        <span className="viz-head-icon" style={{ '--tone': pal.s1 }}>
+                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
+                                        </span>
+                                        <div>
+                                            <h2 className="viz-title">Central de Auditoria</h2>
+                                            <p className="viz-sub">
+                                                {fatia.length} evento{fatia.length === 1 ? '' : 's'} na janela · {ips} IP{ips === 1 ? '' : 's'} distinto{ips === 1 ? '' : 's'}
+                                                {isAuditLoading && ' · atualizando…'}
+                                            </p>
                                         </div>
                                     </div>
-
-                                    {/* Alertas de Segurança Proativos */}
-                                    {(() => {
-                                        const alerts = [];
-                                        const history = statistics?.searchHistory || [];
-
-                                        // Detectar 3+ falhas seguidas de login por Usuário ou IP
-                                        const failureGroups = {};
-                                        history.filter(a => a.action === 'login_failure' || a.action === 'login_failed').forEach(a => {
-                                            const key = a.user || a.ipAddress || 'unknown';
-                                            if (!failureGroups[key]) failureGroups[key] = [];
-                                            failureGroups[key].push(a);
-                                        });
-
-                                        Object.entries(failureGroups).forEach(([key, items]) => {
-                                            if (items.length >= 3) {
-                                                alerts.push({
-                                                    title: `Múltiplas falhas de login: ${key}`,
-                                                    desc: `${items.length} tentativas malsucedidas detectadas.`,
-                                                    severity: items.length >= 5 ? 'critical' : 'warning'
-                                                });
-                                            }
-                                        });
-
-                                        if (alerts.length === 0) return null;
-
-                                        return (
-                                            <div className="flex-1 max-w-md w-full">
-                                                <div className={`p-4 rounded-xl border-2 animate-pulse shadow-lg ${darkMode ? 'bg-red-900/20 border-red-500/50' : 'bg-red-50 border-red-200'}`}>
-                                                    <div className="flex items-center gap-3 mb-2">
-                                                        <svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
-                                                        <h4 className={`text-sm font-bold ${darkMode ? 'text-red-400' : 'text-red-700'}`}>Alertas de Segurança ({alerts.length})</h4>
-                                                    </div>
-                                                    <div className="space-y-2">
-                                                        {alerts.slice(0, 2).map((alert, idx) => (
-                                                            <div key={idx} className="text-xs">
-                                                                <p className={`font-bold ${darkMode ? 'text-red-300' : 'text-red-800'}`}>{alert.title}</p>
-                                                                <p className={`${darkMode ? 'text-red-400/70' : 'text-red-600'}`}>{alert.desc}</p>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        );
-                                    })()}
-                                    <div className="flex gap-3 flex-shrink-0">
-                                        <button
-                                            onClick={() => {
-                                                const bannerHistory = (statistics?.searchHistory || []).filter(a => a.type === 'banner');
-                                                if (bannerHistory.length === 0) { alert('Nenhum dado para exportar.'); return; }
-                                                const rows = [['Timestamp', 'Usuário', 'Serviço Acessado']];
-                                                bannerHistory.forEach(a => {
-                                                    rows.push([
-                                                        new Date(a.timestamp).toLocaleString('pt-BR'),
-                                                        a.user || 'Visitante',
-                                                        a.bannerLabel || '-'
-                                                    ]);
-                                                });
-                                                const csv = rows.map(r => r.map(v => '"' + String(v).replace(/"/g, '""') + '"').join(',')).join('\n');
-                                                const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
-                                                const url = URL.createObjectURL(blob);
-                                                const link = document.createElement('a');
-                                                link.href = url;
-                                                link.download = 'auditoria_acessos_' + new Date().toISOString().split('T')[0] + '.csv';
-                                                link.click();
-                                                URL.revokeObjectURL(url);
-                                            }}
-                                            className={`px-4 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 transition-all ${darkMode ? 'bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 border border-blue-500/20' : 'bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200'}`}
-                                        >
+                                    <div className="viz-head-actions">
+                                        <button onClick={exportarCSV} className="viz-btn" style={{ '--tone': pal.s1 }}>
                                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
                                             Exportar CSV
                                         </button>
                                         <button
                                             onClick={async () => {
-                                                if (window.confirm('ALERTA: Isso apagará irreversivelmente todos os dados de auditoria registrados NO BANCO DE DADOS. Deseja continuar?')) {
-                                                    try {
-                                                        setIsAuditLoading(true);
-                                                        await ApiService.clearAuditLogs();
-                                                        localStorage.removeItem('appStatistics'); // limpeza de cache legado
-                                                        setStatistics({ totalAccesses: 0, totalSearches: 0, universalSearches: 0, advancedSearches: 0, totalBannerClicks: 0, lastAccess: null, dailyAccesses: {}, searchHistory: [], userSessions: {}, bannerClicks: {} });
-                                                        setAuditUserFilter('');
-                                                        alert('Dados de auditoria reiniciados e apagados do servidor com sucesso!');
-                                                    } catch (e) {
-                                                        alert('Erro ao limpar auditoria: ' + e.message);
-                                                    } finally {
-                                                        setIsAuditLoading(false);
-                                                    }
+                                                if (!window.confirm('Isso apagará irreversivelmente todos os registros de auditoria no banco. Continuar?')) return;
+                                                try {
+                                                    setIsAuditLoading(true);
+                                                    await ApiService.clearAuditLogs();
+                                                    localStorage.removeItem('appStatistics');
+                                                    setStatistics({ totalAccesses: 0, totalBannerClicks: 0, totalRegisteredUsers: 0, lastAccess: null, dailyAccesses: {}, searchHistory: [], userSessions: {}, bannerClicks: {} });
+                                                    setAuditUserFilter('');
+                                                } catch (e) {
+                                                    alert('Erro ao limpar auditoria: ' + e.message);
+                                                } finally {
+                                                    setIsAuditLoading(false);
                                                 }
                                             }}
-                                            className={`px-4 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 transition-all ${darkMode ? 'bg-red-500/10 text-red-500 hover:bg-red-500/20 border border-red-500/20' : 'bg-red-50 text-red-600 hover:bg-red-100 border border-red-200'} ${isAuditLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
                                             disabled={isAuditLoading}
+                                            className="viz-btn"
+                                            style={{ '--tone': pal.critical }}
                                         >
                                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                                            {isAuditLoading ? 'Carregando...' : 'Limpar Dados'}
+                                            Limpar
                                         </button>
                                     </div>
+                                </header>
+
+                                {/* Barra de filtros — uma só, acima de tudo que ela escopa */}
+                                <div className="viz-filters">
+                                    <div className="viz-range" role="group" aria-label="Período">
+                                        {AUDIT_RANGES.map(r => (
+                                            <button
+                                                key={r.id}
+                                                onClick={() => setAuditRange(r.id)}
+                                                className={`viz-range-btn ${auditRange === r.id ? 'is-on' : ''}`}
+                                                style={{ '--tone': pal.s1 }}
+                                                aria-pressed={auditRange === r.id}
+                                            >
+                                                {r.label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                    <select value={auditUserFilter} onChange={e => setAuditUserFilter(e.target.value)} className="viz-select">
+                                        <option value="">Todos os usuários</option>
+                                        {[...new Set(todos.map(a => a.user).filter(Boolean))].map(u => <option key={u} value={u}>{u}</option>)}
+                                    </select>
+                                    <select value={auditTypeFilter} onChange={e => setAuditTypeFilter(e.target.value)} className="viz-select">
+                                        <option value="">Todos os eventos</option>
+                                        <option value="banner">Acessos a serviços</option>
+                                        <option value="login">Logins com sucesso</option>
+                                        <option value="login_failure">Falhas</option>
+                                        <option value="admin">Ações administrativas</option>
+                                    </select>
                                 </div>
+
+                                {/* Sinais de segurança — cor de status sempre com ícone + rótulo */}
+                                {sinais.length > 0 && (
+                                    <div className="viz-signals">
+                                        {sinais.slice(0, 3).map(s => (
+                                            <div key={s.origem} className="viz-signal" style={{ '--tone': s.nivel === 'critical' ? pal.critical : pal.warning }}>
+                                                <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                                                <span className="viz-signal-tag">{s.nivel === 'critical' ? 'Crítico' : 'Atenção'}</span>
+                                                <span className="viz-signal-txt"><strong>{s.origem}</strong> — {s.n} falhas de autenticação na janela</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
 
                                 {/* KPIs */}
-                                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-                                    {[
-                                        { title: 'Acessos à Aplicação', value: statistics?.totalAccesses || 0, desc: 'Aberturas da plataforma', icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6', colors: darkMode ? 'bg-blue-500/20 text-blue-400' : 'bg-blue-50 text-blue-600' },
-                                        { title: 'Acessos a Serviços', value: statistics?.totalBannerClicks || 0, desc: 'Cliques em banners', icon: 'M13 10V3L4 14h7v7l9-11h-7z', colors: darkMode ? 'bg-emerald-500/20 text-emerald-400' : 'bg-emerald-50 text-emerald-600' },
-                                        { title: 'Usuários Únicos', value: statistics?.userSessions?.['Usuários Únicos'] || 0, desc: 'Contas que já logaram', icon: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z', colors: darkMode ? 'bg-purple-500/20 text-purple-400' : 'bg-purple-50 text-purple-600' },
-                                        { title: 'Total de Usuários', value: statistics?.totalRegisteredUsers || 0, desc: 'Contas cadastradas', icon: 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z', colors: darkMode ? 'bg-indigo-500/20 text-indigo-400' : 'bg-indigo-50 text-indigo-600' },
-                                        { title: 'Sessões Hoje', value: statistics?.dailyAccesses?.[new Date().toDateString()] || 0, desc: 'Logins na data atual', icon: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z', colors: darkMode ? 'bg-orange-500/20 text-orange-400' : 'bg-orange-50 text-orange-600' }
-                                    ].map((kpi, idx) => (
-                                        <div key={idx} className={`p-5 rounded-2xl flex items-start justify-between gap-3 ${darkMode ? 'bg-gray-800/80 border border-gray-700/50' : 'bg-white border border-gray-100'} shadow-sm`}>
-                                            <div className="min-w-0">
-                                                <p className={`text-xs font-semibold mb-1 uppercase tracking-wider truncate ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{kpi.title}</p>
-                                                <h3 className={`text-3xl font-black tracking-tight ${darkMode ? 'text-white' : 'text-gray-900'}`}>{kpi.value}</h3>
-                                                <p className={`text-xs mt-2 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>{kpi.desc}</p>
-                                            </div>
-                                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${kpi.colors}`}>
-                                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={kpi.icon} /></svg>
-                                            </div>
-                                        </div>
-                                    ))}
+                                <div className="viz-kpis">
+                                    <VizStatTile rotulo="Sessões" valor={sessoes} delta={pct(sessoes, anterior.filter(ehLogin).length)}
+                                        serie={serie} cor={pal.s1} nota="logins com sucesso" />
+                                    <VizStatTile rotulo="Acessos a serviços" valor={servicos} delta={pct(servicos, anterior.filter(ehServico).length)}
+                                        serie={bins.map(b => b.total)} cor={pal.s2} nota="cliques em banners" />
+                                    <VizStatTile rotulo="Usuários ativos" valor={ativos} delta={pct(ativos, new Set(anterior.map(e => e.user).filter(Boolean)).size)}
+                                        cor={pal.s1} nota="contas distintas na janela" />
+                                    <VizStatTile rotulo="Falhas de autenticação" valor={falhas} delta={pct(falhas, anterior.filter(ehFalha).length)}
+                                        cor={falhas > 0 ? pal.critical : pal.muted} nota="tentativas malsucedidas"
+                                        statusCor={falhas > 0 ? pal.critical : undefined} />
+                                    <VizStatTile rotulo="Base de usuários" valor={statistics?.totalRegisteredUsers || 0} delta={null}
+                                        cor={pal.muted} nota="contas cadastradas" />
                                 </div>
 
-                                {/* Analytics Row */}
-                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                    {/* Acessos a Serviços por Usuário */}
-                                    <div className={`p-6 rounded-2xl ${darkMode ? 'bg-gray-800/80 border border-gray-700/50' : 'bg-white border border-gray-100'} shadow-sm`}>
-                                        <div className="flex items-center gap-3 mb-5">
-                                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${darkMode ? 'bg-purple-500/20 text-purple-400' : 'bg-purple-100 text-purple-600'}`}>
-                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
-                                            </div>
-                                            <h3 className={`font-bold text-sm ${darkMode ? 'text-white' : 'text-gray-900'}`}>Acessos a Serviços por Usuário</h3>
-                                        </div>
-                                        {(() => {
-                                            const bannerEvents = (statistics?.searchHistory || []).filter(a => a.type === 'banner');
-                                            const userStats = bannerEvents.reduce((acc, a) => { const u = a.user || 'Visitante'; acc[u] = (acc[u] || 0) + 1; return acc; }, {});
-                                            const sorted = Object.entries(userStats).sort((a, b) => b[1] - a[1]).slice(0, 6);
-                                            const max = sorted[0]?.[1] || 1;
-                                            return sorted.length > 0 ? (
-                                                <div className="space-y-3">
-                                                    {sorted.map(([user, count], i) => (
-                                                        <div key={i}>
-                                                            <div className="flex justify-between items-center mb-1">
-                                                                <span className={`text-xs font-semibold truncate max-w-[200px] ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>{user}</span>
-                                                                <span className={`text-xs font-bold px-2 py-0.5 rounded-full flex-shrink-0 ml-2 ${darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-600'}`}>{count} acessos</span>
-                                                            </div>
-                                                            <div className={`w-full h-2 rounded-full overflow-hidden ${darkMode ? 'bg-gray-700' : 'bg-gray-100'}`}>
-                                                                <div className={`h-full rounded-full transition-all duration-700 ${i === 0 ? 'bg-gradient-to-r from-purple-500 to-indigo-500' : darkMode ? 'bg-purple-500/50' : 'bg-purple-300'}`} style={{ width: `${Math.round((count / max) * 100)}%` }}></div>
-                                                            </div>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            ) : (
-                                                <div className={`flex flex-col items-center justify-center py-8 rounded-xl border border-dashed ${darkMode ? 'border-gray-700 bg-gray-800/30' : 'border-gray-200 bg-gray-50'}`}>
-                                                    <p className={`text-xs font-medium ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>Nenhum acesso a serviço registrado ainda.</p>
-                                                </div>
-                                            );
-                                        })()}
-                                    </div>
+                                {/* Gráficos */}
+                                <div className="viz-row">
+                                    <figure className="viz-card">
+                                        <figcaption className="viz-card-head">
+                                            <h3 className="viz-card-title">Atividade por {passo}</h3>
+                                            <p className="viz-card-sub">Total de eventos registrados</p>
+                                        </figcaption>
+                                        {fatia.length ? <VizTimeline bins={bins} passo={passo} pal={pal} />
+                                            : <p className="viz-empty">Sem eventos na janela selecionada.</p>}
+                                    </figure>
 
-                                    {/* Top Serviços */}
-                                    <div className={`p-6 rounded-2xl ${darkMode ? 'bg-gray-800/80 border border-gray-700/50' : 'bg-white border border-gray-100'} shadow-sm`}>
-                                        <div className="flex items-center gap-3 mb-5">
-                                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${darkMode ? 'bg-emerald-500/20 text-emerald-400' : 'bg-emerald-100 text-emerald-600'}`}>
-                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" /></svg>
-                                            </div>
-                                            <h3 className={`font-bold text-sm ${darkMode ? 'text-white' : 'text-gray-900'}`}>Top Serviços Acessados</h3>
+                                    <figure className="viz-card">
+                                        <figcaption className="viz-card-head">
+                                            <h3 className="viz-card-title">Janelas de uso</h3>
+                                            <p className="viz-card-sub">Eventos por dia da semana e hora</p>
+                                        </figcaption>
+                                        {fatia.length ? <VizHeatmap grade={grade} pal={pal} />
+                                            : <p className="viz-empty">Sem eventos na janela selecionada.</p>}
+                                    </figure>
+                                </div>
+
+                                <div className="viz-row">
+                                    <figure className="viz-card">
+                                        <figcaption className="viz-card-head">
+                                            <h3 className="viz-card-title">Serviços mais acessados</h3>
+                                            <p className="viz-card-sub">Cliques em banners na janela</p>
+                                        </figcaption>
+                                        <VizRankBars dados={topServicos} cor={pal.s1} pal={pal} vazio="Nenhum serviço acessado na janela." />
+                                    </figure>
+
+                                    <figure className="viz-card">
+                                        <figcaption className="viz-card-head">
+                                            <h3 className="viz-card-title">Usuários mais ativos</h3>
+                                            <p className="viz-card-sub">Eventos por conta na janela</p>
+                                        </figcaption>
+                                        <VizRankBars dados={topUsuarios} cor={pal.s2} pal={pal} vazio="Nenhuma atividade na janela." />
+                                    </figure>
+                                </div>
+
+                                {/* Tabela — a leitura exata, sem depender de tooltip */}
+                                <div className="viz-card viz-card--flush">
+                                    <div className="viz-card-head viz-card-head--pad">
+                                        <div>
+                                            <h3 className="viz-card-title">Registro de eventos</h3>
+                                            <p className="viz-card-sub">{fatia.length} registro{fatia.length === 1 ? '' : 's'} na janela e filtros atuais</p>
                                         </div>
-                                        {Object.keys(statistics?.bannerClicks || {}).length > 0 ? (
-                                            <div className="space-y-3">
-                                                {Object.entries(statistics?.bannerClicks || {})
-                                                    .sort((a, b) => b[1] - a[1])
-                                                    .slice(0, 6)
-                                                    .map(([banner, clicks], idx) => {
-                                                        const max = Math.max(...Object.values(statistics?.bannerClicks || {}));
+                                    </div>
+                                    <div className="viz-table-wrap custom-scrollbar">
+                                        {fatia.length ? (
+                                            <table className="viz-table">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Quando</th><th>Usuário</th><th>Evento</th><th>Origem</th><th>Detalhe</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {fatia.slice(0, 300).map((e, i) => {
+                                                        const falhou = ehFalha(e);
                                                         return (
-                                                            <div key={idx}>
-                                                                <div className="flex justify-between items-center mb-1">
-                                                                    <span className={`text-xs font-semibold truncate max-w-[200px] ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>{banner}</span>
-                                                                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full flex-shrink-0 ml-2 ${darkMode ? 'bg-emerald-500/15 text-emerald-400' : 'bg-emerald-50 text-emerald-700'}`}>{clicks} cliques</span>
-                                                                </div>
-                                                                <div className={`w-full h-2 rounded-full overflow-hidden ${darkMode ? 'bg-gray-700' : 'bg-gray-100'}`}>
-                                                                    <div className={`h-full rounded-full transition-all duration-700 ${idx === 0 ? 'bg-gradient-to-r from-emerald-500 to-teal-500' : darkMode ? 'bg-emerald-500/40' : 'bg-emerald-300'}`} style={{ width: `${Math.round((clicks / max) * 100)}%` }}></div>
-                                                                </div>
-                                                            </div>
+                                                            <tr key={i}>
+                                                                <td className="viz-num">{new Date(e.timestamp).toLocaleString('pt-BR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit' })}</td>
+                                                                <td className="viz-strong">{e.user || 'Visitante'}</td>
+                                                                <td>
+                                                                    <span className="viz-badge" style={{ '--tone': falhou ? pal.critical : pal.good }}>
+                                                                        {falhou ? (
+                                                                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
+                                                                        ) : (
+                                                                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
+                                                                        )}
+                                                                        {ehServico(e) ? 'Acesso a serviço' : ehLogin(e) ? 'Login' : falhou ? 'Falha' : (e.action || e.type)}
+                                                                    </span>
+                                                                </td>
+                                                                <td className="viz-num">{e.ipAddress || '—'}</td>
+                                                                <td className="viz-dim">{e.bannerLabel || e.details?.reason || e.details?.username || '—'}</td>
+                                                            </tr>
                                                         );
                                                     })}
-                                            </div>
+                                                </tbody>
+                                            </table>
                                         ) : (
-                                            <div className={`flex flex-col items-center justify-center py-8 rounded-xl border border-dashed ${darkMode ? 'border-gray-700 bg-gray-800/30' : 'border-gray-200 bg-gray-50'}`}>
-                                                <p className={`text-xs font-medium ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>Nenhum serviço acessado ainda.</p>
-                                            </div>
+                                            <p className="viz-empty">Nenhum evento corresponde à janela e aos filtros atuais.</p>
                                         )}
                                     </div>
+                                    {fatia.length > 300 && (
+                                        <p className="viz-table-foot">Mostrando os 300 mais recentes de {fatia.length}. Use o CSV para a lista completa.</p>
+                                    )}
                                 </div>
 
-                                {/* Log de Acessos a Serviços */}
-                                <div className={`rounded-2xl overflow-hidden ${darkMode ? 'bg-gray-800/80 border border-gray-700/50' : 'bg-white border border-gray-100'} shadow-sm`}>
-                                    {/* Filter Bar */}
-                                    <div className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-6 py-4 border-b ${darkMode ? 'border-gray-700/50' : 'border-gray-100'}`}>
-                                        <div className="flex items-center gap-3">
-                                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${darkMode ? 'bg-emerald-500/20 text-emerald-400' : 'bg-emerald-50 text-emerald-600'}`}>
-                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-                                            </div>
-                                            <h3 className={`font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Log de Acessos a Serviços</h3>
-                                            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-500'}`}>
-                                                {(statistics?.searchHistory || []).filter(a => a.type === 'banner').filter(a => auditUserFilter === '' || a.user === auditUserFilter).length} registros
-                                            </span>
-                                        </div>
-                                        <div className="flex flex-wrap items-center gap-3">
-                                            <select
-                                                value={auditUserFilter}
-                                                onChange={e => setAuditUserFilter(e.target.value)}
-                                                className={`text-xs font-semibold rounded-xl px-3 py-1.5 border outline-none transition-colors ${darkMode ? 'bg-gray-800 border-gray-700 text-gray-300' : 'bg-white border-gray-200 text-gray-600'}`}
-                                            >
-                                                <option value="">Todos os usuários</option>
-                                                {[...new Set((statistics?.searchHistory || []).map(a => a.user).filter(Boolean))].map(u => (
-                                                    <option key={u} value={u}>{u}</option>
-                                                ))}
-                                            </select>
-
-                                            <select
-                                                value={auditTypeFilter}
-                                                onChange={e => setAuditTypeFilter(e.target.value)}
-                                                className={`text-xs font-semibold rounded-xl px-3 py-1.5 border outline-none transition-colors ${darkMode ? 'bg-gray-800 border-gray-700 text-gray-300' : 'bg-white border-gray-200 text-gray-600'}`}
-                                            >
-                                                <option value="">Todos os eventos</option>
-                                                <option value="banner">Acessos a Serviços</option>
-                                                <option value="login_failure">Falhas de Login</option>
-                                                <option value="login">Logins com Sucesso</option>
-                                                <option value="admin">Ações Administrativas</option>
-                                            </select>
-                                        </div>
-                                    </div>
-                                    {/* Table */}
-                                    <div className="overflow-x-auto">
-                                        <div className="max-h-[420px] overflow-y-auto custom-scrollbar">
-                                            {(() => {
-                                                const filtered = (statistics?.searchHistory || [])
-                                                    .filter(a => auditUserFilter === '' || a.user === auditUserFilter)
-                                                    .filter(a => {
-                                                        if (auditTypeFilter === '') return true;
-                                                        if (auditTypeFilter === 'banner') return a.type === 'banner' || a.action === 'banner_clicked';
-                                                        if (auditTypeFilter === 'login_failure') return a.action === 'login_failure' || a.action === 'login_failed' || a.action === 'login_failed_password';
-                                                        if (auditTypeFilter === 'login') return a.action === 'login_success' || (a.type === 'access' && a.success !== false);
-                                                        if (auditTypeFilter === 'admin') return a.action?.startsWith('admin_') || a.action?.includes('user_');
-                                                        return true;
-                                                    })
-                                                    .slice().reverse();
-                                                return filtered.length > 0 ? (
-                                                    <table className="w-full text-sm">
-                                                        <thead className={`sticky top-0 z-10 ${darkMode ? 'bg-gray-800/95 border-b border-gray-700/50' : 'bg-gray-50 border-b border-gray-100'}`}>
-                                                            <tr>
-                                                                {['Timestamp', 'Usuário', 'Ação / Evento', 'Detalhes'].map(h => (
-                                                                    <th key={h} className={`px-4 py-3 text-left text-xs font-bold uppercase tracking-wider whitespace-nowrap ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{h}</th>
-                                                                ))}
-                                                            </tr>
-                                                        </thead>
-                                                        <tbody>
-                                                            {filtered.map((a, i) => (
-                                                                <tr key={i} className={`border-b transition-colors ${darkMode ? 'border-gray-700/40 hover:bg-gray-700/30' : 'border-gray-50 hover:bg-gray-50/80'}`}>
-                                                                    <td className={`px-4 py-3 whitespace-nowrap text-xs font-medium ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                                                                        {new Date(a.timestamp).toLocaleString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                                                                    </td>
-                                                                    <td className={`px-4 py-3 whitespace-nowrap text-xs font-bold ${darkMode ? 'text-gray-200' : 'text-gray-800'}`}>
-                                                                        {a.user || 'Visitante'}
-                                                                    </td>
-                                                                    <td className="px-4 py-3 whitespace-nowrap">
-                                                                        <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full ${a.success === false || a.action?.includes('failure') ? (darkMode ? 'bg-red-500/15 text-red-400' : 'bg-red-50 text-red-700') : (darkMode ? 'bg-emerald-500/15 text-emerald-400' : 'bg-emerald-50 text-emerald-700')}`}>
-                                                                            <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${a.success === false || a.action?.includes('failure') ? 'bg-red-500' : 'bg-emerald-500'}`}></span>
-                                                                            {a.action === 'banner_clicked' || a.type === 'banner' ? 'Acesso Serviço' :
-                                                                                a.action === 'login_failure' ? 'Falha Login' :
-                                                                                    a.action === 'login_success' ? 'Login' :
-                                                                                        a.action || a.type}
-                                                                        </span>
-                                                                    </td>
-                                                                    <td className={`px-4 py-3 text-xs ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                                                                        {a.bannerLabel || a.details?.reason || a.details?.username || (typeof a.details === 'string' ? a.details : JSON.stringify(a.details)) || '—'}
-                                                                    </td>
-                                                                </tr>
-                                                            ))}
-                                                        </tbody>
-                                                    </table>
-                                                ) : (
-                                                    <div className={`flex flex-col items-center justify-center py-16 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>
-                                                        <svg className="w-10 h-10 mb-3 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
-                                                        <p className="text-sm font-medium">Nenhum acesso a serviço registrado.</p>
-                                                        <p className="text-xs mt-1 opacity-70">Os acessos via banners aparecerão aqui.</p>
-                                                    </div>
-                                                );
-                                            })()}
-                                        </div>
-                                    </div>
-                                </div>
 
                                 {/* Configurações de Segurança */}
-                                <div className={`p-6 rounded-2xl ${darkMode ? 'bg-gray-800/80 border border-gray-700/50' : 'bg-white border border-gray-100'} shadow-sm`}>
+                                <div className="viz-card">
                                     <div className="flex items-center gap-3 mb-4">
-                                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${darkMode ? 'bg-indigo-500/20 text-indigo-400' : 'bg-indigo-50 text-indigo-600'}`}>
+                                        <span className="viz-head-icon" style={{ '--tone': pal.s1, width: '2rem', height: '2rem' }}>
                                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
-                                        </div>
-                                        <h3 className={`font-bold text-sm ${darkMode ? 'text-white' : 'text-gray-900'}`}>Configurações de Segurança</h3>
+                                        </span>
+                                        <h3 className="viz-card-title">Configurações de Segurança</h3>
                                     </div>
                                     
                                     <div className="space-y-4">
@@ -5115,7 +5323,8 @@ function App() {
                                     </div>
                                 </div>
                             </div>
-                        )}
+                            );
+                        })()}
 
                         {/* Modal Bento Box — Biblioteca */}
                         {bibliotecaModalOpen && (() => {

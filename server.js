@@ -202,6 +202,7 @@ const connectDB = async () => {
 
             db = {
                 isPg: false,
+                handle: sqldb, // exposto para o desligamento gracioso fechar o arquivo
                 query: (text, params) => new Promise((resolve, reject) => {
                     const formattedText = text.replace(/\$\d+/g, '?');
                     sqldb.all(formattedText, params, (err, rows) => {
@@ -1235,10 +1236,15 @@ app.get('/api/admin/audit/stats', authenticateToken, requireAdmin, async (req, r
         });
 
         // 6. Top Serviços Acessados (Agrupamento manual para evitar JSON parsing complexo no SQLite vs PG)
+        // Só cliques em banner com rótulo: sem os dois filtros, todo evento sem
+        // bannerLabel virava uma entrada `null` e os logins entravam como
+        // "Login Realizado", poluindo o ranking de serviços.
         const bannerClicks = {};
-        searchHistory.forEach(s => {
-            bannerClicks[s.bannerLabel] = (bannerClicks[s.bannerLabel] || 0) + 1;
-        });
+        searchHistory
+            .filter(s => s.action === 'banner_clicked' && s.bannerLabel)
+            .forEach(s => {
+                bannerClicks[s.bannerLabel] = (bannerClicks[s.bannerLabel] || 0) + 1;
+            });
 
         res.json({
             totalAccesses,
@@ -1333,6 +1339,57 @@ app.get(/^(?!\/api).*/, (req, res) => {
     res.sendFile(__dirname + '/index.html');
 });
 
-app.listen(PORT, '0.0.0.0', () => {
+const server = app.listen(PORT, '0.0.0.0', () => {
     console.log(`\uD83D\uDE80 Servidor rodando na porta ${PORT}`);
 });
+
+/* --- Desligamento gracioso ---
+   A plataforma envia SIGTERM a cada redeploy ou troca de r\u00E9plica. Sem handler,
+   o processo era morto no meio do caminho: requisi\u00E7\u00F5es em voo cortadas, o pool
+   do Postgres deixado pendurado at\u00E9 expirar do lado do servidor, e o npm
+   reportando o sinal como `npm error` \u2014 ru\u00EDdo que parecia falha da aplica\u00E7\u00E3o.
+
+   Aqui o servidor para de aceitar conex\u00F5es, derruba as keep-alive ociosas,
+   drena o que est\u00E1 em voo, fecha o banco e sai com c\u00F3digo 0, que \u00E9 o
+   encerramento limpo que o orquestrador espera. */
+let encerrando = false;
+
+const encerrarComElegancia = (sinal) => {
+    if (encerrando) return; // um segundo sinal n\u00E3o reentra no fluxo
+    encerrando = true;
+    console.log(`[Shutdown] ${sinal} recebido \u2014 encerrando com eleg\u00E2ncia.`);
+
+    // Rede de seguran\u00E7a: se algo travar no dreno, sai assim mesmo em vez de
+    // pendurar o deploy at\u00E9 o kill for\u00E7ado da plataforma.
+    const prazo = setTimeout(() => {
+        console.error('[Shutdown] Tempo esgotado (10s) \u2014 encerrando \u00E0 for\u00E7a.');
+        process.exit(1);
+    }, 10000);
+    prazo.unref();
+
+    server.close(async (err) => {
+        if (err) console.error('[Shutdown] Erro ao fechar o servidor HTTP:', err.message);
+        else console.log('[Shutdown] Servidor HTTP fechado; nenhuma conex\u00E3o nova aceita.');
+
+        try {
+            if (db && db.pool) {
+                await db.pool.end();
+                console.log('[Shutdown] Pool do PostgreSQL encerrado.');
+            } else if (db && db.handle) {
+                await new Promise(resolve => db.handle.close(resolve));
+                console.log('[Shutdown] Arquivo SQLite fechado.');
+            }
+        } catch (e) {
+            console.error('[Shutdown] Erro ao fechar o banco:', e.message);
+        }
+
+        clearTimeout(prazo);
+        process.exit(0);
+    });
+
+    // Sem isto, uma conex\u00E3o keep-alive ociosa segura o server.close() at\u00E9 o
+    // timeout; dispon\u00EDvel a partir do Node 18.2, da\u00ED a chamada opcional.
+    if (typeof server.closeIdleConnections === 'function') server.closeIdleConnections();
+};
+
+['SIGTERM', 'SIGINT'].forEach(sinal => process.on(sinal, () => encerrarComElegancia(sinal)));

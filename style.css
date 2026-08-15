@@ -2579,3 +2579,503 @@ button.hud-panel:hover {
         transform: none;
     }
 }
+/* ============================================================
+   CENTRAL DE AUDITORIA — camada de visualização
+
+   Paleta validada com o validador do método contra as superfícies REAIS deste
+   projeto (#fbfcfd claro / #131b28 escuro). Marcas finas, grade recessiva em
+   hairline sólido, sem eixo duplo, sem número em cada ponto.
+   ============================================================ */
+
+.viz-page {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+/* --- Cabeçalho --- */
+.viz-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.viz-head-id {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.viz-head-icon {
+    width: 2.4rem;
+    height: 2.4rem;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.8rem;
+    color: var(--tone);
+    background: color-mix(in srgb, var(--tone) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--tone) 26%, transparent);
+}
+
+.viz-title {
+    font-size: 1.25rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: var(--hud-title);
+}
+
+.viz-sub {
+    margin-top: 0.15rem;
+    font-size: 0.75rem;
+    color: var(--hud-muted);
+}
+
+.viz-head-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.viz-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.5rem 0.85rem;
+    border-radius: 0.75rem;
+    font: inherit;
+    font-size: 0.78rem;
+    font-weight: 700;
+    cursor: pointer;
+    color: color-mix(in srgb, var(--tone) 45%, var(--hud-title));
+    background: color-mix(in srgb, var(--tone) 10%, transparent);
+    border: 1px solid color-mix(in srgb, var(--tone) 28%, transparent);
+    transition: background-color 0.25s ease, border-color 0.25s ease, transform 0.25s cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+
+.viz-btn:hover {
+    background-color: color-mix(in srgb, var(--tone) 16%, transparent);
+    border-color: var(--tone);
+    transform: translateY(-1px);
+}
+
+.viz-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* --- Barra de filtros: uma só, acima de tudo que ela escopa --- */
+.viz-filters {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.6rem 0.7rem;
+    border-radius: 1rem;
+    border: 1px solid var(--hud-stroke);
+    background: var(--hud-surface);
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
+}
+
+.viz-range {
+    display: inline-flex;
+    gap: 0.2rem;
+    padding: 0.2rem;
+    border-radius: 0.7rem;
+    background: color-mix(in srgb, var(--hud-title) 6%, transparent);
+}
+
+.viz-range-btn {
+    padding: 0.32rem 0.7rem;
+    border: none;
+    border-radius: 0.55rem;
+    background: transparent;
+    font: inherit;
+    font-size: 0.74rem;
+    font-weight: 700;
+    color: var(--hud-muted);
+    cursor: pointer;
+    transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.viz-range-btn:hover {
+    color: var(--hud-title);
+}
+
+.viz-range-btn.is-on {
+    color: color-mix(in srgb, var(--tone) 45%, var(--hud-title));
+    background: color-mix(in srgb, var(--tone) 16%, transparent);
+}
+
+.viz-select {
+    padding: 0.4rem 0.6rem;
+    border-radius: 0.6rem;
+    font: inherit;
+    font-size: 0.74rem;
+    font-weight: 600;
+    color: var(--hud-title);
+    background: color-mix(in srgb, var(--hud-title) 5%, transparent);
+    border: 1px solid var(--hud-stroke);
+    outline: none;
+}
+
+/* --- Sinais de segurança: cor de status sempre com ícone + rótulo --- */
+.viz-signals {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+
+.viz-signal {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    padding: 0.6rem 0.8rem;
+    border-radius: 0.8rem;
+    font-size: 0.78rem;
+    color: var(--hud-title);
+    background: color-mix(in srgb, var(--tone) 10%, transparent);
+    border: 1px solid color-mix(in srgb, var(--tone) 35%, transparent);
+    border-left: 3px solid var(--tone);
+}
+
+.viz-signal svg {
+    color: var(--tone);
+}
+
+.viz-signal-tag {
+    flex-shrink: 0;
+    font-size: 0.62rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: color-mix(in srgb, var(--tone) 50%, var(--hud-title));
+}
+
+.viz-signal-txt {
+    color: var(--hud-muted);
+}
+
+.viz-signal-txt strong {
+    color: var(--hud-title);
+}
+
+/* --- KPIs --- */
+.viz-kpis {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+    gap: 0.75rem;
+}
+
+.viz-tile {
+    padding: 0.9rem 1rem;
+    border-radius: 1rem;
+    border: 1px solid var(--hud-stroke);
+    background: var(--hud-surface);
+}
+
+.viz-tile-label {
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: var(--hud-muted);
+}
+
+.viz-tile-row {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-top: 0.3rem;
+}
+
+/* Figuras proporcionais: tabular-nums deixa números grandes frouxos. */
+.viz-tile-value {
+    font-size: 1.75rem;
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: -0.02em;
+    color: var(--hud-title);
+}
+
+.viz-spark {
+    flex-shrink: 0;
+    overflow: visible;
+}
+
+.viz-tile-foot {
+    margin-top: 0.45rem;
+    font-size: 0.68rem;
+    color: var(--hud-muted);
+}
+
+.viz-delta {
+    font-weight: 800;
+    margin-right: 0.35rem;
+}
+
+/* --- Cards de gráfico --- */
+.viz-row {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.85rem;
+}
+
+@media (min-width: 1024px) {
+    .viz-row {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+.viz-card {
+    margin: 0;
+    padding: 1.1rem;
+    border-radius: 1.1rem;
+    border: 1px solid var(--hud-stroke);
+    background: var(--hud-surface);
+    min-width: 0;
+}
+
+.viz-card--flush {
+    padding: 0;
+    overflow: hidden;
+}
+
+.viz-card-head {
+    margin-bottom: 0.9rem;
+}
+
+.viz-card-head--pad {
+    padding: 1.1rem 1.1rem 0.9rem;
+    margin-bottom: 0;
+    border-bottom: 1px solid var(--hud-stroke);
+}
+
+.viz-card-title {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: var(--hud-title);
+}
+
+.viz-card-sub {
+    margin-top: 0.15rem;
+    font-size: 0.72rem;
+    color: var(--hud-muted);
+}
+
+/* O container cresce com o conteúdo: altura fixa cortaria a faixa do eixo x. */
+.viz-svg {
+    display: block;
+    width: 100%;
+    height: auto;
+    overflow: visible;
+}
+
+.viz-tick {
+    font-size: 10px;
+    font-variant-numeric: tabular-nums;
+}
+
+.viz-peak {
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.viz-col:hover rect+rect {
+    opacity: 1;
+}
+
+/* --- Mapa de calor --- */
+.viz-heat-grid {
+    display: grid;
+    grid-template-columns: 2rem repeat(24, 1fr);
+    gap: 2px;
+    align-items: center;
+}
+
+.viz-heat-day,
+.viz-heat-hour {
+    font-size: 0.6rem;
+    font-weight: 700;
+    color: var(--hud-muted);
+}
+
+.viz-heat-hour {
+    text-align: center;
+}
+
+/* O gap de 2px na cor da superfície separa as células — nunca um contorno. */
+.viz-heat-cell {
+    aspect-ratio: 1 / 1;
+    border-radius: 3px;
+    border: 1px solid transparent;
+    cursor: default;
+}
+
+.viz-scale {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    margin-top: 0.8rem;
+}
+
+.viz-scale-step {
+    width: 1.4rem;
+    height: 0.5rem;
+    border-radius: 2px;
+}
+
+.viz-tick-txt {
+    font-size: 0.62rem;
+    font-weight: 700;
+    color: var(--hud-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+/* --- Barras de ranking --- */
+.viz-rank {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.viz-rank-row {
+    display: grid;
+    grid-template-columns: minmax(0, 9rem) 1fr auto;
+    align-items: center;
+    gap: 0.6rem;
+}
+
+.viz-rank-name {
+    font-size: 0.76rem;
+    font-weight: 600;
+    color: var(--hud-title);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.viz-rank-track {
+    height: 0.6rem;
+    border-radius: 999px;
+    overflow: hidden;
+}
+
+.viz-rank-fill {
+    display: block;
+    height: 100%;
+    border-radius: 0 4px 4px 0;
+    transition: width 0.6s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* Valor rotulado direto: nenhum número fica preso ao tooltip. */
+.viz-rank-val {
+    font-size: 0.74rem;
+    font-weight: 700;
+    color: var(--hud-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+/* --- Tabela --- */
+.viz-table-wrap {
+    max-height: 26rem;
+    overflow: auto;
+}
+
+.viz-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.76rem;
+}
+
+.viz-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    padding: 0.6rem 0.9rem;
+    text-align: left;
+    font-size: 0.64rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--hud-muted);
+    background: var(--hud-solid);
+    border-bottom: 1px solid var(--hud-stroke);
+    white-space: nowrap;
+}
+
+.viz-table td {
+    padding: 0.55rem 0.9rem;
+    border-bottom: 1px solid var(--hud-stroke);
+    color: var(--hud-muted);
+    white-space: nowrap;
+}
+
+.viz-table tbody tr:hover td {
+    background: color-mix(in srgb, var(--hud-title) 4%, transparent);
+}
+
+.viz-num {
+    font-variant-numeric: tabular-nums;
+}
+
+.viz-strong {
+    font-weight: 700;
+    color: var(--hud-title);
+}
+
+.viz-dim {
+    max-width: 20rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.viz-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: 0.45rem;
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: color-mix(in srgb, var(--tone) 45%, var(--hud-title));
+    background: color-mix(in srgb, var(--tone) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--tone) 28%, transparent);
+}
+
+.viz-badge svg {
+    color: var(--tone);
+}
+
+.viz-table-foot {
+    padding: 0.6rem 1.1rem;
+    font-size: 0.7rem;
+    color: var(--hud-muted);
+    border-top: 1px solid var(--hud-stroke);
+}
+
+.viz-empty {
+    padding: 2.5rem 1rem;
+    text-align: center;
+    font-size: 0.78rem;
+    color: var(--hud-muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+    .viz-btn,
+    .viz-rank-fill {
+        transition-duration: 0.01ms;
+    }
+
+    .viz-btn:hover {
+        transform: none;
+    }
+}
