@@ -1351,7 +1351,12 @@ const server = app.listen(PORT, '0.0.0.0', () => {
 
    Aqui o servidor para de aceitar conex\u00F5es, derruba as keep-alive ociosas,
    drena o que est\u00E1 em voo, fecha o banco e sai com c\u00F3digo 0, que \u00E9 o
-   encerramento limpo que o orquestrador espera. */
+   encerramento limpo que o orquestrador espera.
+
+   IMPORTANTE: só funciona se o node for quem recebe o sinal. Com `npm start`
+   o PID 1 é o npm, que repassa o SIGTERM por um `sh` e marca a execução como
+   falha de qualquer jeito — por isso railway.json fixa o startCommand em
+   `node server.js`. */
 let encerrando = false;
 
 const encerrarComElegancia = (sinal) => {
@@ -1362,9 +1367,9 @@ const encerrarComElegancia = (sinal) => {
     // Rede de seguran\u00E7a: se algo travar no dreno, sai assim mesmo em vez de
     // pendurar o deploy at\u00E9 o kill for\u00E7ado da plataforma.
     const prazo = setTimeout(() => {
-        console.error('[Shutdown] Tempo esgotado (10s) \u2014 encerrando \u00E0 for\u00E7a.');
+        console.error('[Shutdown] Tempo esgotado (8s) \u2014 encerrando \u00E0 for\u00E7a.');
         process.exit(1);
-    }, 10000);
+    }, 8000);
     prazo.unref();
 
     server.close(async (err) => {
@@ -1390,6 +1395,21 @@ const encerrarComElegancia = (sinal) => {
     // Sem isto, uma conex\u00E3o keep-alive ociosa segura o server.close() at\u00E9 o
     // timeout; dispon\u00EDvel a partir do Node 18.2, da\u00ED a chamada opcional.
     if (typeof server.closeIdleConnections === 'function') server.closeIdleConnections();
+
+    // Conexões com requisição em andamento não são "ociosas": ganham 3s para
+    // terminar e depois são derrubadas, senão um cliente lento adia o encerramento.
+    if (typeof server.closeAllConnections === 'function') {
+        const corte = setTimeout(() => {
+            console.warn('[Shutdown] Derrubando conexões ainda ativas após 3s.');
+            server.closeAllConnections();
+        }, 3000);
+        corte.unref();
+    }
 };
 
 ['SIGTERM', 'SIGINT'].forEach(sinal => process.on(sinal, () => encerrarComElegancia(sinal)));
+
+// Marcador de versão: prova nos logs de boot que este build tem o handler. Sem
+// ele não dá para distinguir "handler não rodou" de "log foi descartado", já
+// que o Railway para de coletar saída a partir de "Stopping Container".
+console.log(`[Boot] Desligamento gracioso armado (SIGTERM/SIGINT) · node ${process.version} · pid ${process.pid}`);
