@@ -2752,6 +2752,14 @@ const BANNER_STATIC = {
     }
 };
 
+const DEFAULT_BANNERS = Object.keys(BANNER_STATIC).map((key, index) => ({
+    id: key,
+    key: key,
+    label: BANNER_STATIC[key].label,
+    enabled: true,
+    orderIndex: index
+}));
+
 // ==================== LISTAS AUXILIARES DE SUB-BANNERS ====================
 const DTE_SUB_BANNERS_KEYS = [
     'dte-portal', 'dte-meuiss', 'dte-nfe', 'dte-iptu', 'dte-meuiptu', 'dte-login', 'dte-simples-fiscal', 'dte-helpdesk'
@@ -3318,7 +3326,7 @@ function App() {
     };
 
     // Estado de configuração de banners
-    const [bannerConfig, setBannerConfig] = useState([]);
+    const [bannerConfig, setBannerConfig] = useState(DEFAULT_BANNERS);
 
     // Drag and Drop Banners refs
     const dragItem = useRef();
@@ -3331,31 +3339,6 @@ function App() {
 
     // Carregar/recarregar config de banners ao montar e sempre que voltar para Home
     useEffect(() => {
-        const defaultBanners = [
-            { id: 'banner-iss-cnae', key: 'iss-cnae', label: 'Consulta ISS / CNAE', enabled: true },
-            { id: 'banner-pareceres', key: 'pareceres', label: 'Gerador de Pareceres', enabled: true },
-            { id: 'banner-processos', key: 'processos', label: 'Análise de Processos', enabled: true },
-            { id: 'banner-painel-distribuicao', key: 'painel-distribuicao', label: 'Painel de Distribuição', enabled: true },
-            { id: 'banner-entes', key: 'entes', label: 'Entes Federados', enabled: true },
-            { id: 'banner-empresa-facil', key: 'empresa-facil', label: 'Empresa Fácil', enabled: true },
-            { id: 'banner-biblioteca', key: 'biblioteca', label: 'Biblioteca', enabled: true },
-            { id: 'banner-sistema-ponto', key: 'sistema-ponto', label: 'Sistema de Ponto', enabled: true },
-            { id: 'banner-justificativas-ponto', key: 'justificativas-ponto', label: 'Justificativas de Ponto', enabled: true },
-            { id: 'banner-contra-cheque', key: 'contra-cheque', label: 'Contra-cheque', enabled: true },
-            // Sub-Banners DTE
-            { id: 'dte-portal', key: 'dte-portal', label: 'Terra Cloud (DTE)', enabled: true },
-            { id: 'dte-meuiss', key: 'dte-meuiss', label: 'Meu ISS (DTE)', enabled: true },
-            { id: 'dte-nfe', key: 'dte-nfe', label: 'NFS-e / Nota Fiscal (DTE)', enabled: true },
-            { id: 'dte-iptu', key: 'dte-iptu', label: 'Protocolo (DTE)', enabled: true },
-            { id: 'dte-meuiptu', key: 'dte-meuiptu', label: 'Meu IPTU (DTE)', enabled: true },
-            { id: 'dte-login', key: 'dte-login', label: 'DTE - Domicílio Tributário', enabled: true },
-            { id: 'dte-simples-fiscal', key: 'dte-simples-fiscal', label: 'Simples Fiscal (DTE)', enabled: true },
-            { id: 'dte-helpdesk', key: 'dte-helpdesk', label: 'HelpDesk Tickets (DTE)', enabled: true },
-            // Sub-Banners Consultas Fiscais
-            { id: 'consultas-iss-cnae', key: 'consultas-iss-cnae', label: 'Consulta ISS / CNAE (CF)', enabled: true },
-            { id: 'consultas-nfse-nacional', key: 'consultas-nfse-nacional', label: 'Consulta NFS-e Nacional (CF)', enabled: true },
-        ];
-
         const loadBanners = () => {
             // Passa o token para receber banners personalizados do usuário
             ApiService.getBanners()
@@ -3363,7 +3346,7 @@ function App() {
                     // Mescla banners da API com os defaults para garantir que novos banners apareçam
                     // mesmo se o backend estiver desatualizado (sem restart)
                     const merged = [...data];
-                    defaultBanners.forEach(def => {
+                    DEFAULT_BANNERS.forEach(def => {
                         if (!merged.find(b => b.key === def.key)) {
                             merged.push(def);
                         }
@@ -3371,7 +3354,7 @@ function App() {
                     setBannerConfig(merged);
                 })
                 .catch(() => {
-                    setBannerConfig(defaultBanners);
+                    setBannerConfig(DEFAULT_BANNERS);
                 });
         };
         loadBanners();
@@ -3380,7 +3363,15 @@ function App() {
     // Função para recarregar banners manualmente (ex: após gerenciar banners de um usuário)
     const reloadBanners = () => {
         ApiService.getBanners()
-            .then(data => setBannerConfig(data))
+            .then(data => {
+                const merged = [...data];
+                DEFAULT_BANNERS.forEach(def => {
+                    if (!merged.find(b => b.key === def.key)) {
+                        merged.push(def);
+                    }
+                });
+                setBannerConfig(merged);
+            })
             .catch(() => { });
     };
 
