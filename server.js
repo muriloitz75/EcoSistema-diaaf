@@ -26,7 +26,11 @@ const connectDB = async () => {
     console.log(`[DB] PGHOST presente: ${!!process.env.PGHOST}`);
     console.log(`[DB] Connection via: ${dbUrl ? 'PostgreSQL' : 'SQLite (fallback)'}`);
 
-    const maxRetries = 10;
+    // Retry curto e constante: quando o Postgres do Railway está "acordando",
+    // ele costuma ficar pronto em poucos segundos. Backoff exponencial (2s, 4s, 8s, 15s...)
+    // fazia o servidor esperar muito além do necessário.
+    const maxRetries = 30;
+    const retryDelayMs = 1000;
     let retries = 0;
 
     // Diagnóstico de DNS para o hostname do banco
@@ -46,7 +50,7 @@ const connectDB = async () => {
             const pool = new Pool({
                 connectionString: dbUrl,
                 ssl: { rejectUnauthorized: false },
-                connectionTimeoutMillis: 10000,
+                connectionTimeoutMillis: 5000,
                 idleTimeoutMillis: 30000,
                 max: 20
             });
@@ -116,11 +120,15 @@ const connectDB = async () => {
                     { table: 'AuditLog', from: 'ipaddress', to: 'ipAddress' },
                     { table: 'AuditLog', from: 'useragent', to: 'userAgent' },
                 ];
-                for (const m of colMigrations) {
-                    try {
-                        await pool.query(`ALTER TABLE "${m.table}" RENAME COLUMN ${m.from} TO "${m.to}"`);
-                    } catch (e) { }
-                }
+                // Executa todas as renomeações em UMA única ida ao banco (antes eram 12 queries
+                // sequenciais). Cada uma fica em seu próprio bloco com EXCEPTION, preservando
+                // o comportamento anterior de ignorar colunas que não existem.
+                const renameSql = colMigrations.map(m => `
+                    DO $$ BEGIN
+                        ALTER TABLE "${m.table}" RENAME COLUMN ${m.from} TO "${m.to}";
+                    EXCEPTION WHEN others THEN NULL;
+                    END $$;`).join('\n');
+                try { await pool.query(renameSql); } catch (e) { }
 
                 const migrations = [
                     `ALTER TABLE "BannerConfig" ADD COLUMN IF NOT EXISTS "orderIndex" INTEGER DEFAULT 0`,
@@ -135,9 +143,13 @@ const connectDB = async () => {
                     `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "passwordHistory" JSONB DEFAULT '[]'::jsonb`,
                     `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "isBlockedByAdmin" BOOLEAN DEFAULT false`,
                 ];
-                for (const mig of migrations) {
-                    try { await pool.query(mig); } catch (e) { }
-                }
+                // Uma única ida ao banco (antes eram 11 queries sequenciais).
+                const migrationSql = migrations.map(mig => `
+                    DO $$ BEGIN
+                        ${mig};
+                    EXCEPTION WHEN others THEN NULL;
+                    END $$;`).join('\n');
+                try { await pool.query(migrationSql); } catch (e) { }
 
                 const defaultBanners = [
                     { id: 'iss-cnae', key: 'iss-cnae', label: 'Consulta ISS / CNAE' },
@@ -166,13 +178,17 @@ const connectDB = async () => {
                     { id: 'consultas-iss-cnae', key: 'consultas-iss-cnae', label: 'Consulta ISS / CNAE (CF)' },
                     { id: 'consultas-nfse-nacional', key: 'consultas-nfse-nacional', label: 'Consulta NFS-e Nacional (CF)' }
                 ];
-                for (let i = 0; i < defaultBanners.length; i++) {
-                    const b = defaultBanners[i];
-                    await pool.query(
-                        `INSERT INTO "BannerConfig" (id, key, label, enabled, "orderIndex") VALUES ($1, $2, $3, $4, $5) ON CONFLICT (key) DO NOTHING`,
-                        [b.id, b.key, b.label, true, i]
-                    );
-                }
+                // INSERT multi-linha: 1 query em vez de 25 sequenciais.
+                const bannerParams = [];
+                const bannerValues = defaultBanners.map((b, i) => {
+                    const o = i * 5;
+                    bannerParams.push(b.id, b.key, b.label, true, i);
+                    return `($${o + 1}, $${o + 2}, $${o + 3}, $${o + 4}, $${o + 5})`;
+                }).join(', ');
+                await pool.query(
+                    `INSERT INTO "BannerConfig" (id, key, label, enabled, "orderIndex") VALUES ${bannerValues} ON CONFLICT DO NOTHING`,
+                    bannerParams
+                );
 
                 await pool.query(
                     `INSERT INTO "SystemConfig" (id, key, value) VALUES ($1, $2, $3) ON CONFLICT (key) DO NOTHING`,
@@ -184,10 +200,11 @@ const connectDB = async () => {
             } catch (err) {
                 console.error(`[DB] Erro ao conectar (Tentativa ${retries + 1}):`, err.message);
                 retries++;
+                db = undefined;
+                pool.end().catch(() => { }); // evita acumular pools abertos a cada tentativa
                 if (retries < maxRetries) {
-                    const delay = Math.min(Math.pow(2, retries) * 1000, 15000);
-                    console.log(`[DB] Tentando novamente em ${delay / 1000}s...`);
-                    await new Promise(res => setTimeout(res, delay));
+                    console.log(`[DB] Tentando novamente em ${retryDelayMs / 1000}s...`);
+                    await new Promise(res => setTimeout(res, retryDelayMs));
                     return tryConnect();
                 } else {
                     console.error("[DB] Máximo de tentativas atingido.");
@@ -298,11 +315,28 @@ const connectDB = async () => {
     } catch (e) { }
 };
 
-// Conectar ao Banco de Dados na inicialização
-connectDB().catch(console.error);
+// Conectar ao Banco de Dados na inicialização.
+// dbReady resolve quando a inicialização termina (com sucesso ou não), permitindo que
+// as requisições que chegam durante o "despertar" aguardem em vez de falhar com 503.
+let dbInitDone = false;
+const dbReady = connectDB()
+    .catch(console.error)
+    .finally(() => { dbInitDone = true; });
 
+// Gzip/deflate: reduz bastante o tráfego de script/dados.json/CSS.
+app.use(require('compression')());
 app.use(cors());
 app.use(express.json());
+
+// Durante o despertar (Serverless do Railway), segura a requisição até o banco ficar pronto
+// e responde assim que ele conectar. Antes, o servidor devolvia 503 e o navegador só tentava
+// de novo 2s depois, somando espera desnecessária. /api/health continua respondendo na hora.
+const DB_WAIT_TIMEOUT_MS = 25000;
+app.use('/api', async (req, res, next) => {
+    if (dbInitDone || req.path === '/health') return next();
+    await Promise.race([dbReady, new Promise(r => setTimeout(r, DB_WAIT_TIMEOUT_MS))]);
+    next();
+});
 
 // Função utilitária global para UUID versão simples
 function uuidv4() {
@@ -1330,8 +1364,35 @@ app.delete('/api/admin/audit', authenticateToken, requireAdmin, async (req, res)
     }
 });
 
+// Bundle pré-compilado do frontend (npm run build). Responde 404 se não existir ou se
+// estiver mais antigo que o script.js, para o index.html cair no modo Babel em vez de
+// receber o index.html pela rota catch-all ou servir uma versão desatualizada.
+const fs = require('fs');
+const path = require('path');
+app.get(/^\/dist\/app\.js(\.map)?$/, (req, res) => {
+    const bundlePath = path.join(__dirname, 'dist', 'app.js');
+    try {
+        const bundleStat = fs.statSync(bundlePath);
+        const sourceStat = fs.statSync(path.join(__dirname, 'script.js'));
+        if (bundleStat.mtimeMs < sourceStat.mtimeMs) return res.status(404).end();
+    } catch (e) {
+        return res.status(404).end();
+    }
+    // no-cache = sempre revalida via ETag (304 barato), nunca serve versão antiga.
+    res.sendFile(bundlePath + (req.params[0] || ''), { headers: { 'Cache-Control': 'no-cache' } });
+});
+
 // Servir arquivos estáticos da página inicial.
-app.use(express.static(__dirname));
+// Imagens mudam raramente: cache de 7 dias. Demais arquivos (HTML/JS/CSS/JSON) revalidam via ETag.
+app.use(express.static(__dirname, {
+    setHeaders: (res, filePath) => {
+        if (/\.(png|jpe?g|gif|svg|webp|ico)$/i.test(filePath)) {
+            res.setHeader('Cache-Control', 'public, max-age=604800');
+        } else {
+            res.setHeader('Cache-Control', 'no-cache');
+        }
+    }
+}));
 
 // Rota catch-all para Single Page Application (SPA)
 // Isso garante que qualquer rota não encontrada pela API retorne o index.html do frontend

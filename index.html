@@ -24,6 +24,7 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://unpkg.com" crossorigin>
     <link
         href="https://fonts.googleapis.com/css2?family=Fredoka:wght@300..700&family=Grand+Hotel&family=Montserrat:wght@900&display=swap"
         rel="stylesheet">
@@ -70,6 +71,11 @@
     </div>
 
     <script>
+        // Pré-aquecimento: dispara o "despertar" do banco assim que o HTML chega,
+        // em paralelo ao download de React/Babel e à digitação do login.
+        if (window.location.protocol !== 'file:') {
+            try { fetch('/api/health', { cache: 'no-store' }).catch(function () { }); } catch (e) { }
+        }
         window.__USE_HTTP_SERVER__ = (window.location.protocol !== 'file:');
         window.__LOAD_ERROR__ = null;
         if (!window.__USE_HTTP_SERVER__) {
@@ -94,12 +100,14 @@
             return false;
         };
     </script>
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Versões fixas: evita o redirecionamento extra do unpkg a cada carregamento -->
+    <script crossorigin src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
     <script>
-        (function () {
+        // Fallback: só é usado quando dist/app.js não está disponível.
+        window.__loadWithBabel = function () {
             if (window.__USE_HTTP_SERVER__ === false) return;
+            console.warn('[loader] dist/app.js indisponível — compilando script.js no navegador (modo dev).');
             function showLoadError(msg) {
                 var status = document.getElementById('load-status');
                 var errEl = document.getElementById('load-error-msg');
@@ -136,17 +144,20 @@
                         console.error(e);
                     });
             }
-            if (typeof Babel !== 'undefined' && typeof React !== 'undefined' && typeof ReactDOM !== 'undefined') {
-                runApp();
-            } else {
-                window.addEventListener('load', function () {
-                    if (typeof Babel === 'undefined') return showLoadError('Babel não carregou. Verifique sua conexão.');
-                    if (typeof React === 'undefined' || typeof ReactDOM === 'undefined') return showLoadError('React não carregou. Verifique sua conexão.');
-                    runApp();
-                });
-            }
-        })();
+            if (typeof React === 'undefined' || typeof ReactDOM === 'undefined') return showLoadError('React não carregou. Verifique sua conexão.');
+            var babelScript = document.createElement('script');
+            babelScript.src = 'https://unpkg.com/@babel/standalone@7.26.4/babel.min.js';
+            babelScript.onload = runApp;
+            babelScript.onerror = function () { showLoadError('Babel não carregou. Verifique sua conexão.'); };
+            document.head.appendChild(babelScript);
+        };
     </script>
+    <!--
+        Bundle pré-compilado (npm run build → dist/app.js). Dispensa o Babel no navegador.
+        Se não existir (dev local sem build) ou estiver desatualizado, o servidor responde 404
+        e o onerror ativa o modo de compilação no navegador (Babel), como antes.
+    -->
+    <script src="./dist/app.js" onerror="window.__loadWithBabel()"></script>
     <script>
         setTimeout(function () {
             if (window.__APP_LOADED__) return;

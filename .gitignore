@@ -12,3 +12,6 @@ dev.sqlite3
 .agent/
 .gemini/
 .env
+
+# Bundle do frontend - gerado no build do Railway (npm run build)
+dist/

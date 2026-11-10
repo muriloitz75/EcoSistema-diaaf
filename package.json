@@ -4,6 +4,7 @@
   "description": "Sistema de Consulta Fiscal - CNAE e LIST LC",
   "scripts": {
     "start": "node server.js",
+    "build": "node tools/build-frontend.js",
     "dev": "nodemon server.js",
     "dados:normalize": "python tools/normalize_textual_consistency.py",
     "dados:sync": "python tools/sync_norma_to_dados.py"
@@ -50,6 +51,7 @@
     "dotenv": "^17.3.1",
     "eastasianwidth": "^0.2.0",
     "emoji-regex": "^9.2.2",
+    "esbuild": "0.25.10",
     "execa": "^5.1.1",
     "express": "^5.2.1",
     "fast-deep-equal": "^3.1.3",

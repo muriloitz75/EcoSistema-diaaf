@@ -861,7 +861,7 @@ function LoginForm({ onLogin, darkMode, wakeProgress, setWakeProgress }) {
                 setWakeProgress(1); // Inicia progresso
 
                 let retryCount = 0;
-                const maxRetries = 15;
+                const maxRetries = 30;
                 const retryLogin = async () => {
                     retryCount++;
                     setWakeProgress(Math.min(95, Math.floor((retryCount / maxRetries) * 100)));
@@ -876,7 +876,7 @@ function LoginForm({ onLogin, darkMode, wakeProgress, setWakeProgress }) {
                         }, 600);
                     } catch (retryError) {
                         if (retryCount < maxRetries) {
-                            setTimeout(retryLogin, 2000);
+                            setTimeout(retryLogin, 1000);
                         } else {
                             setWakeProgress(0);
                             setError('Servidor não respondeu a tempo. Tente novamente em instantes.');
@@ -3217,7 +3217,7 @@ function App() {
                         setWakeProgress(1);
 
                         let retryCount = 0;
-                        const maxRetries = 15;
+                        const maxRetries = 30;
                         const retryValidate = async () => {
                             retryCount++;
                             setWakeProgress(Math.min(95, Math.floor((retryCount / maxRetries) * 100)));
@@ -3232,7 +3232,7 @@ function App() {
                                 }, 600);
                             } catch (retryError) {
                                 if (retryCount < maxRetries) {
-                                    setTimeout(retryValidate, 2000);
+                                    setTimeout(retryValidate, 1000);
                                 } else {
                                     setWakeProgress(0);
                                     setIsSessionValidating(false);
@@ -3240,7 +3240,7 @@ function App() {
                                 }
                             }
                         };
-                        setTimeout(retryValidate, 2000);
+                        setTimeout(retryValidate, 1000);
                         return; // O setIsSessionValidating(false) será chamado no final do retry
                     } else {
                         setIsAuthenticated(false);
@@ -3618,7 +3618,7 @@ function App() {
                 setWakeProgress(1); // Inicia progresso
 
                 let retryCount = 0;
-                const maxRetries = 15;
+                const maxRetries = 30;
                 const retryLogin = async () => {
                     retryCount++;
                     // Atualiza a barra reservando 100% para o sucesso
@@ -3635,8 +3635,8 @@ function App() {
                             setWakeProgress(0);
                         }, 600); // tempo para o smooth da animacao ate 100%
                     } catch (retryError) {
-                        if (retryCount < maxRetries) { // maxRetries * 2s = 30s
-                            setTimeout(retryLogin, 2000);
+                        if (retryCount < maxRetries) { // maxRetries * 1s = 30s
+                            setTimeout(retryLogin, 1000);
                         } else {
                             setWakeProgress(0);
                             setUnlockError('Servidor não respondeu a tempo. Atualize a página e tente novamente.');
@@ -3644,7 +3644,7 @@ function App() {
                         }
                     }
                 };
-                setTimeout(retryLogin, 2000);
+                setTimeout(retryLogin, 1000);
             } else {
                 setUnlockError(error.message || 'Senha incorreta. Tente novamente.');
                 setIsUnlocking(false);
