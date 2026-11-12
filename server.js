@@ -152,7 +152,6 @@ const connectDB = async () => {
                 try { await pool.query(migrationSql); } catch (e) { }
 
                 const defaultBanners = [
-                    { id: 'iss-cnae', key: 'iss-cnae', label: 'Consulta ISS / CNAE' },
                     { id: 'pareceres', key: 'pareceres', label: 'Gerador de Pareceres' },
                     { id: 'processos', key: 'processos', label: 'Análise de Processos' },
                     { id: 'painel-distribuicao', key: 'painel-distribuicao', label: 'Painel de Distribuição' },
@@ -174,9 +173,7 @@ const connectDB = async () => {
                     { id: 'dte-meuiptu', key: 'dte-meuiptu', label: 'Meu IPTU (DTE)' },
                     { id: 'dte-login', key: 'dte-login', label: 'DTE - Domicílio Tributário' },
                     { id: 'dte-simples-fiscal', key: 'dte-simples-fiscal', label: 'Simples Fiscal (DTE)' },
-                    { id: 'dte-helpdesk', key: 'dte-helpdesk', label: 'HelpDesk Tickets (DTE)' },
-                    { id: 'consultas-iss-cnae', key: 'consultas-iss-cnae', label: 'Consulta ISS / CNAE (CF)' },
-                    { id: 'consultas-nfse-nacional', key: 'consultas-nfse-nacional', label: 'Consulta NFS-e Nacional (CF)' }
+                    { id: 'dte-helpdesk', key: 'dte-helpdesk', label: 'HelpDesk Tickets (DTE)' }
                 ];
                 // INSERT multi-linha: 1 query em vez de 25 sequenciais.
                 const bannerParams = [];
@@ -249,7 +246,6 @@ const connectDB = async () => {
             } catch (e) { }
 
             const defaultBanners = [
-                { id: 'iss-cnae', key: 'iss-cnae', label: 'Consulta ISS / CNAE' },
                 { id: 'pareceres', key: 'pareceres', label: 'Gerador de Pareceres' },
                 { id: 'processos', key: 'processos', label: 'Análise de Processos' },
                 { id: 'painel-distribuicao', key: 'painel-distribuicao', label: 'Painel de Distribuição' },
@@ -271,9 +267,7 @@ const connectDB = async () => {
                 { id: 'dte-meuiptu', key: 'dte-meuiptu', label: 'Meu IPTU (DTE)' },
                 { id: 'dte-login', key: 'dte-login', label: 'DTE - Domicílio Tributário' },
                 { id: 'dte-simples-fiscal', key: 'dte-simples-fiscal', label: 'Simples Fiscal (DTE)' },
-                { id: 'dte-helpdesk', key: 'dte-helpdesk', label: 'HelpDesk Tickets (DTE)' },
-                { id: 'consultas-iss-cnae', key: 'consultas-iss-cnae', label: 'Consulta ISS / CNAE (CF)' },
-                { id: 'consultas-nfse-nacional', key: 'consultas-nfse-nacional', label: 'Consulta NFS-e Nacional (CF)' }
+                { id: 'dte-helpdesk', key: 'dte-helpdesk', label: 'HelpDesk Tickets (DTE)' }
             ];
             for (let i = 0; i < defaultBanners.length; i++) {
                 const b = defaultBanners[i];

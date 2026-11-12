@@ -1,4 +1,4 @@
-const { useState, useEffect, useRef, useMemo } = React;
+const { useState, useEffect, useLayoutEffect, useRef, useMemo } = React;
 
 // Error Boundary para exibir erros de renderização
 class ErrorBoundary extends React.Component {
@@ -508,248 +508,152 @@ function UserProfilePage({ user, onLogout, onCredentialsChanged, darkMode }) {
         setSuccessMessage('');
     };
 
-    const inputBase = `w-full px-4 py-3 rounded-xl border-2 transition-all duration-200 focus:ring-2 focus:ring-offset-0 focus:outline-none ${darkMode ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400 focus:border-blue-500 focus:ring-blue-500/30' : 'bg-white border-gray-200 text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:ring-blue-500/20'}`;
-    const inputError = 'border-red-500 focus:border-red-500 focus:ring-red-500/30';
+    const inicial = (user.name || user.username || 'U').charAt(0).toUpperCase();
+    const dataBR = (v) => new Date(v).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+
+    // Campo de formulário no padrão do painel (rótulo, ícone, erro ligado por aria-describedby).
+    const campo = (field, label, { type = 'text', icon, placeholder, autoComplete, wide } = {}) => {
+        const id = `perfil-${field}`;
+        const erro = errors[field];
+        return (
+            <div className={`pc-field ${wide ? 'pc-span-2' : ''}`}>
+                <label htmlFor={id} className="pc-label">{label}</label>
+                <div className={`pc-input ${erro ? 'is-invalid' : ''}`}>
+                    {icon && <PcIcon name={icon} size={18} />}
+                    <input
+                        id={id}
+                        type={type}
+                        value={formData[field]}
+                        onChange={(e) => handleInputChange(field, e.target.value)}
+                        disabled={isLoading}
+                        placeholder={placeholder}
+                        autoComplete={autoComplete}
+                        aria-invalid={!!erro}
+                        aria-describedby={erro ? `${id}-erro` : undefined}
+                    />
+                </div>
+                {erro && <p id={`${id}-erro`} className="pc-field-error">{erro}</p>}
+            </div>
+        );
+    };
+
+    const fatos = [
+        { label: 'Nome completo', value: user.name || 'Não informado', icon: 'user' },
+        { label: 'E-mail', value: user.email || 'Não informado', icon: 'mail' },
+        { label: 'Usuário', value: '@' + user.username, icon: 'at', mono: true },
+        { label: 'Último acesso', value: user.lastLogin ? dataBR(user.lastLogin) : 'Primeiro acesso', icon: 'clock' },
+        { label: 'Senha alterada em', value: user.lastPasswordChange ? dataBR(user.lastPasswordChange) : 'Nunca alterada', icon: 'key' }
+    ];
 
     return (
-        <div className={`rounded-3xl overflow-hidden animate-fadeInUp shadow-2xl ${darkMode ? 'bg-gray-800 border-gray-700/50' : 'bg-white border-gray-100'} border`}>
-            {/* Cabeçalho Premium com glassmorphism e glow */}
-            <div className={`relative py-12 px-8 overflow-hidden ${darkMode ? 'bg-gradient-to-r from-gray-900 via-blue-900/40 to-gray-900' : 'bg-gradient-to-r from-blue-600 via-blue-500 to-indigo-700'}`}>
-                <div className="absolute inset-0 bg-white opacity-5 mix-blend-overlay pointer-events-none"></div>
-                {/* Glow effects */}
-                <div className="absolute top-0 left-1/4 w-64 h-64 bg-blue-500/30 rounded-full mix-blend-multiply filter blur-3xl opacity-50 animate-pulse"></div>
-                <div className="absolute top-0 right-1/4 w-64 h-64 bg-cyan-500/30 rounded-full mix-blend-multiply filter blur-3xl opacity-50 animate-pulse" style={{ animationDelay: '2s' }}></div>
-
-                <div className="relative flex flex-col md:flex-row items-center gap-8 z-10 max-w-5xl mx-auto">
-                    <div className="relative group">
-                        <div className={`absolute -inset-0.5 rounded-full blur opacity-50 group-hover:opacity-100 transition duration-500 ${darkMode ? 'bg-gradient-to-r from-blue-400 to-cyan-500' : 'bg-gradient-to-r from-white/50 to-white/30'}`}></div>
-                        <div className={`relative w-28 h-28 rounded-full flex items-center justify-center text-5xl font-extrabold shadow-2xl ring-4 ${darkMode ? 'ring-gray-800 bg-gray-900 text-transparent bg-clip-text bg-gradient-to-br from-blue-400 to-cyan-400' : 'ring-white/40 bg-white/20 backdrop-blur-md text-white'}`}>
-                            {(user.name || user.username || 'U').charAt(0).toUpperCase()}
-                        </div>
-                    </div>
-
-                    <div className="flex-1 text-center md:text-left">
-                        <h2 className={`text-3xl sm:text-4xl font-extrabold tracking-tight drop-shadow-sm ${darkMode ? 'text-white' : 'text-white'}`}>
-                            {user.name || user.username || 'Meu Perfil'}
-                        </h2>
-                        <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 mt-4">
-                            <span className={`px-4 py-1 rounded-full text-xs font-bold uppercase tracking-wider backdrop-blur-md border ${user.role === 'admin' ? (darkMode ? 'bg-amber-500/20 text-amber-300 border-amber-500/30' : 'bg-amber-400/30 text-amber-50 border-amber-300/50') : (darkMode ? 'bg-blue-500/20 text-blue-300 border-blue-500/30' : 'bg-blue-400/30 text-blue-50 border-blue-300/50')}`}>
-                                {user.role === 'admin' ? 'Administrador' : 'Usuário'}
-                            </span>
-                            <span className={`text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-blue-100'}`}>
-                                @{user.username}
-                            </span>
-                        </div>
-                    </div>
-
-                    <div>
-                        <button
-                            onClick={onLogout}
-                            className={`group relative inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-medium transition-all duration-300 overflow-hidden shadow-lg backdrop-blur-md border ${darkMode ? 'bg-gray-800/50 hover:bg-red-500/20 text-gray-300 hover:text-red-400 border-gray-700 hover:border-red-500/30' : 'bg-white/10 hover:bg-white text-white hover:text-red-600 border-white/30 hover:border-white shadow-[0_0_15px_rgba(255,255,255,0.1)]'}`}
-                        >
-                            <span className="relative z-10 flex items-center gap-2">
-                                <svg className={`w-5 h-5 transition-transform group-hover:-translate-x-1`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                                </svg>
-                                Desconectar
-                            </span>
-                        </button>
+        <div className="pc-page animate-fadeInUp">
+            <header className="pc-hero">
+                <span className="pc-hero-avatar" aria-hidden="true">{inicial}</span>
+                <div className="pc-hero-text">
+                    <h1 className="pc-page-title">{user.name || user.username || 'Meu Perfil'}</h1>
+                    <div className="pc-hero-meta">
+                        <span className={`pc-badge ${user.role === 'admin' ? 'pc-badge--warn' : 'pc-badge--brand'}`}>
+                            {user.role === 'admin' ? 'Administrador' : 'Usuário'}
+                        </span>
+                        <span className="pc-mono">@{user.username}</span>
                     </div>
                 </div>
-            </div>
+                <div className="pc-hero-actions">
+                    {!isEditing && (
+                        <button type="button" className="pc-btn pc-btn--primary" onClick={() => setIsEditing(true)}>
+                            <PcIcon name="edit" size={16} />
+                            Editar perfil
+                        </button>
+                    )}
+                    <button type="button" className="pc-btn" onClick={onLogout}>
+                        <PcIcon name="logout" size={16} />
+                        Desconectar
+                    </button>
+                </div>
+            </header>
 
-            {/* Mensagens de feedback */}
             {successMessage && (
-                <div className={`mx-6 mt-6 p-4 rounded-xl flex items-center gap-3 ${darkMode ? 'bg-green-900/30 border border-green-700 text-green-300' : 'bg-green-50 border border-green-200 text-green-800'}`}>
-                    <svg className="w-5 h-5 flex-shrink-0 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <span className="font-medium">{successMessage}</span>
+                <div className="pc-alert pc-alert--ok" role="status">
+                    <PcIcon name="check" size={18} />
+                    <span>{successMessage}</span>
                 </div>
             )}
             {errors.general && (
-                <div className={`mx-6 mt-6 p-4 rounded-xl flex items-center gap-3 ${darkMode ? 'bg-red-900/30 border border-red-700 text-red-300' : 'bg-red-50 border border-red-200 text-red-800'}`}>
-                    <svg className="w-5 h-5 flex-shrink-0 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <span className="font-medium">{errors.general}</span>
+                <div className="pc-alert pc-alert--error" role="alert">
+                    <PcIcon name="alert" size={18} />
+                    <span>{errors.general}</span>
                 </div>
             )}
 
-            {/* Conteúdo: informações ou formulário */}
-            <div className={`p-8 ${darkMode ? 'bg-gray-800/50' : 'bg-gray-50/50'}`}>
-                {!isEditing ? (
-                    <div className="animate-fadeIn">
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
-                            <h3 className={`text-xl font-bold flex items-center gap-3 ${darkMode ? 'text-white' : 'text-gray-800'}`}>
-                                <div className={`p-2 rounded-lg ${darkMode ? 'bg-blue-900/50 text-blue-400' : 'bg-blue-100 text-blue-600'}`}>
-                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                                    </svg>
-                                </div>
-                                Dados da Conta
-                            </h3>
+            {!isEditing ? (
+                <section className="pc-box" aria-labelledby="perfil-dados">
+                    <div className="pc-box-head">
+                        <div>
+                            <h2 id="perfil-dados" className="pc-box-title">Dados da conta</h2>
+                            <p className="pc-box-sub">Informações que identificam você no Ecossistema.</p>
+                        </div>
+                    </div>
+                    <dl className="pc-facts">
+                        {fatos.map(f => (
+                            <div key={f.label} className="pc-fact">
+                                <dt><PcIcon name={f.icon} size={15} />{f.label}</dt>
+                                <dd className={f.mono ? 'pc-mono' : ''} title={f.value}>{f.value}</dd>
+                            </div>
+                        ))}
+                    </dl>
+                </section>
+            ) : (
+                <form className="pc-box" onSubmit={handleSubmit} noValidate aria-labelledby="perfil-editar">
+                    <div className="pc-box-head">
+                        <div>
+                            <h2 id="perfil-editar" className="pc-box-title">Editar informações</h2>
+                            <p className="pc-box-sub">Revise os dados e salve para aplicar.</p>
+                        </div>
+                    </div>
+                    <div className="pc-box-body pc-form-grid">
+                        {campo('name', 'Nome completo', { icon: 'user', placeholder: 'Seu nome completo', autoComplete: 'name' })}
+                        {campo('email', 'E-mail', { type: 'email', icon: 'mail', placeholder: 'seu@email.com', autoComplete: 'email' })}
+                        {campo('username', 'Usuário', { icon: 'at', placeholder: 'usuario', autoComplete: 'username', wide: true })}
+                    </div>
+
+                    <div className="pc-box-body pc-box-body--sep">
+                        <div className="pc-toggle-row">
+                            <span className="pc-tile" style={{ '--accent': 'var(--pc-brand)' }}><PcIcon name="lock" size={18} /></span>
+                            <div className="pc-toggle-text">
+                                <strong id="perfil-seg">Alterar senha</strong>
+                                <span>Exige a senha atual para confirmar sua identidade.</span>
+                            </div>
                             <button
-                                onClick={() => setIsEditing(true)}
-                                className={`inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl font-semibold transition-all duration-300 transform hover:-translate-y-0.5 shadow-md hover:shadow-lg ${darkMode ? 'bg-blue-600 hover:bg-blue-500 text-white border-none' : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white border-none'}`}
-                            >
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                </svg>
-                                Editar Perfil
-                            </button>
+                                type="button"
+                                role="switch"
+                                aria-checked={showPasswordFields}
+                                aria-labelledby="perfil-seg"
+                                className={`pc-switch ${showPasswordFields ? 'is-on' : ''}`}
+                                onClick={() => setShowPasswordFields(v => !v)}
+                                disabled={isLoading}
+                            />
                         </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                            {[
-                                { label: 'Nome Completo', value: user.name || 'Não informado', icon: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z', color: 'blue' },
-                                { label: 'Endereço de Email', value: user.email || 'Não informado', icon: 'M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z', color: 'purple' },
-                                { label: 'Nome de Usuário', value: '@' + user.username, icon: 'M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z', color: 'indigo' },
-                                { label: 'Último Acesso', value: user.lastLogin ? new Date(user.lastLogin).toLocaleString('pt-BR') : 'Primeiro acesso', icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z', color: 'emerald' },
-                                { label: 'Modificação de Senha', value: user.lastPasswordChange ? new Date(user.lastPasswordChange).toLocaleString('pt-BR') : 'Nunca alterada', icon: 'M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z', color: 'amber' }
-                            ].map((item, i) => {
-                                const colors = {
-                                    blue: darkMode ? 'bg-blue-900/30 text-blue-400 border-blue-800/50' : 'bg-blue-50 text-blue-600 border-blue-100',
-                                    purple: darkMode ? 'bg-purple-900/30 text-purple-400 border-purple-800/50' : 'bg-purple-50 text-purple-600 border-purple-100',
-                                    indigo: darkMode ? 'bg-indigo-900/30 text-indigo-400 border-indigo-800/50' : 'bg-indigo-50 text-indigo-600 border-indigo-100',
-                                    emerald: darkMode ? 'bg-emerald-900/30 text-emerald-400 border-emerald-800/50' : 'bg-emerald-50 text-emerald-600 border-emerald-100',
-                                    amber: darkMode ? 'bg-amber-900/30 text-amber-400 border-amber-800/50' : 'bg-amber-50 text-amber-600 border-amber-100',
-                                };
-                                const iconClass = colors[item.color];
-
-                                return (
-                                    <div key={i} className={`p-6 rounded-2xl border transition-all duration-300 hover:-translate-y-1 hover:shadow-lg ${darkMode ? 'bg-gray-800/60 border-gray-700/50 hover:border-gray-600 hover:bg-gray-800/90' : 'bg-white border-gray-100 hover:border-gray-200 shadow-sm hover:shadow-md'}`}>
-                                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-5 border ${iconClass}`}>
-                                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={item.icon} /></svg>
-                                        </div>
-                                        <p className={`text-xs font-bold uppercase tracking-wider mb-1.5 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>{item.label}</p>
-                                        <p className={`font-semibold text-lg truncate ${darkMode ? 'text-gray-200' : 'text-gray-800'}`} title={item.value}>{item.value}</p>
-                                    </div>
-                                )
-                            })}
-                        </div>
+                        {showPasswordFields && (
+                            <div className="pc-form-grid" style={{ marginTop: '1.25rem' }}>
+                                {campo('currentPassword', 'Senha atual', { type: 'password', icon: 'key', placeholder: 'Sua senha atual', autoComplete: 'current-password', wide: true })}
+                                <div className="pc-field">
+                                    {campo('newPassword', 'Nova senha', { type: 'password', icon: 'lock', placeholder: 'Mínimo 8 caracteres', autoComplete: 'new-password' })}
+                                    {formData.newPassword && <PasswordStrengthIndicator password={formData.newPassword} hideErrors={!!errors.newPassword} />}
+                                </div>
+                                {campo('confirmPassword', 'Confirmar nova senha', { type: 'password', icon: 'lock', placeholder: 'Repita a nova senha', autoComplete: 'new-password' })}
+                            </div>
+                        )}
                     </div>
-                ) : (
-                    <div className="animate-fadeIn">
-                        <div className="flex items-center justify-between mb-8">
-                            <h3 className={`text-xl font-bold flex items-center gap-3 ${darkMode ? 'text-white' : 'text-gray-800'}`}>
-                                <div className={`p-2 rounded-lg ${darkMode ? 'bg-blue-900/50 text-blue-400' : 'bg-blue-100 text-blue-600'}`}>
-                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                                    </svg>
-                                </div>
-                                Editar Informações
-                            </h3>
-                        </div>
 
-                        <form onSubmit={handleSubmit} className="space-y-8">
-                            {/* Secao de dados basicos */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div className="space-y-2">
-                                    <label className={`block text-sm font-semibold ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>Nome Completo</label>
-                                    <div className="relative">
-                                        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                                            <svg className={`h-5 w-5 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
-                                        </div>
-                                        <input type="text" value={formData.name} onChange={(e) => handleInputChange('name', e.target.value)} disabled={isLoading}
-                                            className={`pl-11 ${inputBase} ${errors.name ? inputError : ''}`} placeholder="Seu nome completo" />
-                                    </div>
-                                    {errors.name && <p className="text-sm font-medium text-red-500 animate-fadeIn">{errors.name}</p>}
-                                </div>
-                                <div className="space-y-2">
-                                    <label className={`block text-sm font-semibold ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>Endereço de Email</label>
-                                    <div className="relative">
-                                        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                                            <svg className={`h-5 w-5 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
-                                        </div>
-                                        <input type="email" value={formData.email} onChange={(e) => handleInputChange('email', e.target.value)} disabled={isLoading}
-                                            className={`pl-11 ${inputBase} ${errors.email ? inputError : ''}`} placeholder="seu@email.com" />
-                                    </div>
-                                    {errors.email && <p className="text-sm font-medium text-red-500 animate-fadeIn">{errors.email}</p>}
-                                </div>
-                                <div className="space-y-2 md:col-span-2">
-                                    <label className={`block text-sm font-semibold ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>Nome de Usuário</label>
-                                    <div className="relative">
-                                        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                                            <svg className={`h-5 w-5 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                                        </div>
-                                        <input type="text" value={formData.username} onChange={(e) => handleInputChange('username', e.target.value)} disabled={isLoading}
-                                            className={`pl-11 ${inputBase} ${errors.username ? inputError : ''}`} placeholder="usuario" />
-                                    </div>
-                                    {errors.username && <p className="text-sm font-medium text-red-500 animate-fadeIn">{errors.username}</p>}
-                                </div>
-                            </div>
-
-                            {/* Secao de Seguranca Destacada */}
-                            <div className={`p-6 md:p-8 rounded-2xl border transition-all ${darkMode ? 'bg-gray-800/80 border-gray-700/80 hover:border-indigo-500/50' : 'bg-gray-50/80 border-gray-200 hover:border-indigo-300'} mt-8 relative overflow-hidden group`}>
-                                <div className={`absolute top-0 left-0 w-1.5 h-full ${darkMode ? 'bg-indigo-500/80 group-hover:bg-indigo-400' : 'bg-indigo-500 group-hover:bg-indigo-600'} transition-colors`}></div>
-
-                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-2">
-                                    <div className="flex items-center gap-4">
-                                        <div className={`p-3 rounded-xl ${darkMode ? 'bg-indigo-900/40 text-indigo-400' : 'bg-white shadow-sm border border-indigo-100 text-indigo-600'}`}>
-                                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
-                                        </div>
-                                        <div>
-                                            <h4 className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-gray-800'}`}>Segurança da Conta</h4>
-                                            <p className={`text-sm mt-0.5 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Gerencie sua senha de acesso</p>
-                                        </div>
-                                    </div>
-                                    <label className="relative inline-flex items-center cursor-pointer">
-                                        <input type="checkbox" className="sr-only peer" checked={showPasswordFields} onChange={(e) => setShowPasswordFields(e.target.checked)} disabled={isLoading} />
-                                        <div className={`w-12 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-indigo-300 dark:peer-focus:ring-indigo-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 ${darkMode ? 'peer-checked:bg-indigo-500' : 'peer-checked:bg-indigo-600'}`}></div>
-                                        <span className={`ml-3 text-sm font-semibold ${darkMode ? (showPasswordFields ? 'text-indigo-400' : 'text-gray-500') : (showPasswordFields ? 'text-indigo-600' : 'text-gray-500')}`}>{showPasswordFields ? 'Visível' : 'Oculto'}</span>
-                                    </label>
-                                </div>
-
-                                {showPasswordFields && (
-                                    <div className={`mt-8 pt-8 border-t ${darkMode ? 'border-gray-700' : 'border-gray-200'} grid grid-cols-1 md:grid-cols-2 gap-6 animate-fadeInDown`}>
-                                        <div className="space-y-2 md:col-span-2">
-                                            <label className={`block text-sm font-semibold ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>Senha Atual</label>
-                                            <input type="password" value={formData.currentPassword} onChange={(e) => handleInputChange('currentPassword', e.target.value)} disabled={isLoading}
-                                                className={`${inputBase} ${errors.currentPassword ? inputError : ''}`} placeholder="Requisitada para confirmar sua identidade" />
-                                            {errors.currentPassword && <p className="text-sm font-medium text-red-500 animate-fadeIn">{errors.currentPassword}</p>}
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className={`block text-sm font-semibold ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>Nova Senha</label>
-                                            <input type="password" value={formData.newPassword} onChange={(e) => handleInputChange('newPassword', e.target.value)} disabled={isLoading}
-                                                className={`${inputBase} ${errors.newPassword ? inputError : ''}`} placeholder="Mínimo 8 caracteres" />
-                                            {errors.newPassword && <p className="text-sm font-medium text-red-500 animate-fadeIn">{errors.newPassword}</p>}
-                                            {formData.newPassword && <div className="mt-2"><PasswordStrengthIndicator password={formData.newPassword} darkMode={darkMode} /></div>}
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className={`block text-sm font-semibold ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>Confirmar Nova Senha</label>
-                                            <input type="password" value={formData.confirmPassword} onChange={(e) => handleInputChange('confirmPassword', e.target.value)} disabled={isLoading}
-                                                className={`${inputBase} ${errors.confirmPassword ? inputError : ''}`} placeholder="Repita a nova senha" />
-                                            {errors.confirmPassword && <p className="text-sm font-medium text-red-500 animate-fadeIn">{errors.confirmPassword}</p>}
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-
-                            <div className={`flex flex-col sm:flex-row justify-end items-center gap-4 pt-6 mt-6 border-t ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
-                                <button type="button" onClick={handleCancel} disabled={isLoading}
-                                    className={`w-full sm:w-auto px-6 py-3 rounded-xl font-bold transition-all ${darkMode ? 'bg-gray-700 hover:bg-gray-600 text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-700'}`}>
-                                    Cancelar
-                                </button>
-                                <button type="submit" disabled={isLoading}
-                                    className={`w-full sm:w-auto inline-flex items-center justify-center gap-2 px-8 py-3 rounded-xl font-bold transition-all transform hover:-translate-y-0.5 shadow-lg hover:shadow-xl ${darkMode ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:opacity-90' : 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:opacity-90'}`}>
-                                    {isLoading ? (
-                                        <>
-                                            <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                                            Salvando...
-                                        </>
-                                    ) : (
-                                        <>
-                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                                            Salvar Alterações
-                                        </>
-                                    )}
-                                </button>
-                            </div>
-                        </form>
+                    <div className="pc-box-foot">
+                        <button type="button" className="pc-btn" onClick={handleCancel} disabled={isLoading}>Cancelar</button>
+                        <button type="submit" className="pc-btn pc-btn--primary" disabled={isLoading}>
+                            {isLoading ? <span className="pc-spin pc-spin--ink" aria-hidden="true" /> : <PcIcon name="check" size={16} />}
+                            {isLoading ? 'Salvando…' : 'Salvar alterações'}
+                        </button>
                     </div>
-                )}
-            </div>
+                </form>
+            )}
         </div>
     );
 }
@@ -1212,63 +1116,26 @@ function LoginForm({ onLogin, darkMode, wakeProgress, setWakeProgress }) {
     );
 }
 // Componente de Indicador de Força da Senha
-function PasswordStrengthIndicator({ password, darkMode }) {
+function PasswordStrengthIndicator({ password, hideErrors = false }) {
+    if (!password) return null;
     const score = CredentialValidator.generatePasswordStrengthScore(password);
     const validation = CredentialValidator.validatePassword(password);
-
-    const getStrengthText = (score) => {
-        switch (score) {
-            case 0:
-            case 1: return 'Muito Fraca';
-            case 2: return 'Fraca';
-            case 3: return 'Média';
-            case 4: return 'Forte';
-            case 5: return 'Muito Forte';
-            default: return 'Muito Fraca';
-        }
-    };
-
-    const getStrengthColor = (score) => {
-        switch (score) {
-            case 0:
-            case 1: return 'bg-red-500';
-            case 2: return 'bg-orange-500';
-            case 3: return 'bg-yellow-500';
-            case 4: return 'bg-blue-500';
-            case 5: return 'bg-green-500';
-            default: return 'bg-gray-300';
-        }
-    };
-
-    if (!password) return null;
+    const nivel = score <= 1 ? { t: 'Muito fraca', c: 'var(--pc-danger)' }
+        : score === 2 ? { t: 'Fraca', c: 'var(--pc-danger)' }
+            : score === 3 ? { t: 'Média', c: 'var(--pc-amber)' }
+                : score === 4 ? { t: 'Forte', c: 'var(--pc-brand)' }
+                    : { t: 'Muito forte', c: 'var(--pc-teal)' };
 
     return (
-        <div className="mt-2">
-            <div className="flex items-center justify-between mb-1">
-                <span className={`text-xs ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
-                    Força da senha:
-                </span>
-                <span className={`text-xs font-medium ${score <= 2 ? 'text-red-500' :
-                    score <= 3 ? 'text-yellow-500' :
-                        'text-green-500'
-                    }`}>
-                    {getStrengthText(score)}
-                </span>
+        <div className="pc-strength" style={{ '--tone': nivel.c }}>
+            <div className="pc-strength-bars" aria-hidden="true">
+                {[1, 2, 3, 4, 5].map(i => <span key={i} className={i <= score ? 'is-on' : ''} />)}
             </div>
-            <div className={`w-full bg-gray-200 rounded-full h-2 ${darkMode ? 'bg-gray-700' : ''}`}>
-                <div
-                    className={`h-2 rounded-full transition-all duration-300 ${getStrengthColor(score)}`}
-                    style={{ width: `${(score / 5) * 100}%` }}
-                ></div>
-            </div>
-            {validation.errors.length > 0 && (
-                <div className="mt-1">
-                    {validation.errors.map((error, index) => (
-                        <p key={index} className="text-xs text-red-500">
-                            • {error}
-                        </p>
-                    ))}
-                </div>
+            <span className="pc-strength-label">Força da senha: <strong>{nivel.t}</strong></span>
+            {!hideErrors && validation.errors.length > 0 && (
+                <ul className="pc-strength-errors">
+                    {validation.errors.map((erro, i) => <li key={i}>{erro}</li>)}
+                </ul>
             )}
         </div>
     );
@@ -1810,7 +1677,7 @@ function PieChart({ data, darkMode, title }) {
 }
 
 // Componente da Tabela de Administradores
-function AdminUsersTable({ darkMode, adminUsersListKey, onRefreshNeeded }) {
+function AdminUsersTable({ adminUsersListKey, onRefreshNeeded }) {
     const [users, setUsers] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
 
@@ -1864,65 +1731,79 @@ function AdminUsersTable({ darkMode, adminUsersListKey, onRefreshNeeded }) {
         }
     };
 
-    if (isLoading) {
-        return <div className={`p-4 text-center ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Carregando usuários...</div>;
-    }
+    const [filtro, setFiltro] = useState('');
+    const termo = filtro.trim().toLowerCase();
+    const bloqueado = (u) => u.isBlockedByAdmin === true || u.isBlockedByAdmin === 1; // SQLite devolve 1/0
+    const visiveis = users.filter(u => !termo
+        || (u.name || '').toLowerCase().includes(termo)
+        || (u.username || '').toLowerCase().includes(termo));
+    const totalBloqueados = users.filter(bloqueado).length;
 
     return (
-        <table className="min-w-full">
-            <thead className={darkMode ? 'bg-gray-700' : 'bg-gray-100'}>
-                <tr>
-                    <th className={`px-4 py-3 text-left text-xs font-semibold uppercase ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>Nome</th>
-                    <th className={`px-4 py-3 text-left text-xs font-semibold uppercase ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>Usuário</th>
-                    <th className={`px-4 py-3 text-left text-xs font-semibold uppercase ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>Perfil</th>
-                    <th className={`px-4 py-3 text-left text-xs font-semibold uppercase ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>Status</th>
-                    <th className={`px-4 py-3 text-right text-xs font-semibold uppercase ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>Ações</th>
-                </tr>
-            </thead>
-            <tbody className={`divide-y ${darkMode ? 'divide-gray-700' : 'divide-gray-200'}`}>
-                {users.map(user => {
-                    // Trata boolean do SQLite ("true" / 1 ou "false" / 0)
-                    const isBlocked = user.isBlockedByAdmin === true || user.isBlockedByAdmin === 1;
+        <section className="pc-box" aria-labelledby="usuarios-contas">
+            <div className="pc-box-head">
+                <div>
+                    <h2 id="usuarios-contas" className="pc-box-title">Contas</h2>
+                    <p className="pc-box-sub">
+                        {users.length} {users.length === 1 ? 'usuário' : 'usuários'}
+                        {totalBloqueados > 0 && ` · ${totalBloqueados} ${totalBloqueados === 1 ? 'bloqueado' : 'bloqueados'}`}
+                    </p>
+                </div>
+                <div className="pc-input pc-input--sm pc-box-search">
+                    <PcIcon name="search" size={16} />
+                    <label htmlFor="usuarios-filtro" className="pc-sr-only">Filtrar contas</label>
+                    <input id="usuarios-filtro" type="search" value={filtro} onChange={(e) => setFiltro(e.target.value)} placeholder="Filtrar por nome ou usuário" />
+                </div>
+            </div>
 
-                    return (
-                        <tr key={user.id} className={darkMode ? 'bg-gray-800' : 'bg-white'}>
-                            <td className={`px-4 py-3 text-sm flex items-center gap-2 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                                <div className="w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center text-white text-xs font-bold">
-                                    {(user.name || '?').charAt(0).toUpperCase()}
+            {isLoading ? (
+                <div className="pc-loading"><span className="pc-spin" aria-hidden="true" />Carregando usuários…</div>
+            ) : visiveis.length === 0 ? (
+                <div className="pc-empty">
+                    <span className="pc-empty-ico"><PcIcon name="users" /></span>
+                    <strong>{termo ? 'Nenhuma conta encontrada' : 'Nenhuma conta cadastrada'}</strong>
+                    {termo && <span>Nada corresponde a “{filtro}”.</span>}
+                </div>
+            ) : (
+                <ul className="pc-rows">
+                    {visiveis.map(user => {
+                        const isBlocked = bloqueado(user);
+                        const isAdminUser = user.role === 'admin';
+                        return (
+                            <li key={user.id} className={`pc-row ${isBlocked ? 'is-muted' : ''}`}>
+                                <span className="pc-avatar">{(user.name || user.username || '?').charAt(0).toUpperCase()}</span>
+                                <div className="pc-row-main">
+                                    <span className="pc-row-name">{user.name || user.username}</span>
+                                    <span className="pc-row-sub pc-mono">@{user.username}</span>
                                 </div>
-                                {user.name}
-                            </td>
-                            <td className={`px-4 py-3 text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>{user.username}</td>
-                            <td className="px-4 py-3">
-                                <span className={`text-xs px-2 py-1 rounded-full ${user.role === 'admin' ? (darkMode ? 'bg-red-900/50 text-red-400' : 'bg-red-100 text-red-700') : (darkMode ? 'bg-gray-600 text-gray-300' : 'bg-gray-100 text-gray-700')}`}>
-                                    {user.role === 'admin' ? 'Administrador' : 'Usuário'}
-                                </span>
-                            </td>
-                            <td className="px-4 py-3">
-                                <span className={`text-xs px-2 py-1 flex items-center gap-1 w-max rounded-full font-medium ${isBlocked ? (darkMode ? 'bg-red-900/40 text-red-400' : 'bg-red-100 text-red-600') : (darkMode ? 'bg-green-900/40 text-green-400' : 'bg-green-100 text-green-600')}`}>
-                                    {isBlocked ? 'Bloqueado' : 'Ativo'}
-                                </span>
-                            </td>
-                            <td className="px-4 py-3 text-right text-sm">
-                                {user.role !== 'admin' && (
-                                    <div className="flex justify-end gap-2">
-                                        <button onClick={() => handleResetPassword(user)} className={`p-1.5 rounded-lg border flex items-center justify-center ${darkMode ? 'border-gray-600 hover:bg-gray-700 text-gray-300' : 'border-gray-200 hover:bg-gray-100 text-gray-600'}`} title="Resetar senha: 'Mudar@123'">
-                                            🔑
-                                        </button>
-                                        <button onClick={() => handleToggleBlock(user)} className={`p-1.5 rounded-lg border flex items-center justify-center ${darkMode ? 'border-gray-600 hover:bg-gray-700 text-gray-300' : 'border-gray-200 hover:bg-gray-100 text-gray-600'}`} title={isBlocked ? 'Desbloquear usuário' : 'Bloquear usuário'}>
-                                            🔒
-                                        </button>
-                                        <button onClick={() => handleDelete(user)} className={`p-1.5 rounded-lg border flex items-center justify-center ${darkMode ? 'border-red-900 hover:bg-red-900/50 text-red-400' : 'border-red-200 hover:bg-red-100 text-red-600'}`} title="Excluir">
-                                            🗑️
-                                        </button>
-                                    </div>
-                                )}
-                            </td>
-                        </tr>
-                    );
-                })}
-            </tbody>
-        </table>
+                                <div className="pc-row-tags">
+                                    <span className={`pc-badge ${isAdminUser ? 'pc-badge--warn' : 'pc-badge--muted'}`}>{isAdminUser ? 'Administrador' : 'Usuário'}</span>
+                                    <span className={`pc-badge ${isBlocked ? 'pc-badge--crit' : 'pc-badge--ok'}`}>{isBlocked ? 'Bloqueado' : 'Ativo'}</span>
+                                </div>
+                                <div className="pc-row-actions">
+                                    {!isAdminUser && (
+                                        <>
+                                            <button type="button" className="pc-iconbtn pc-iconbtn--sm" onClick={() => handleResetPassword(user)}
+                                                aria-label={`Redefinir senha de ${user.username}`} title="Redefinir senha para Mudar@123">
+                                                <PcIcon name="key" size={16} />
+                                            </button>
+                                            <button type="button" className="pc-iconbtn pc-iconbtn--sm" onClick={() => handleToggleBlock(user)}
+                                                aria-label={isBlocked ? `Desbloquear ${user.username}` : `Bloquear ${user.username}`} title={isBlocked ? 'Desbloquear' : 'Bloquear'}>
+                                                <PcIcon name={isBlocked ? 'unlock' : 'lock'} size={16} />
+                                            </button>
+                                            <button type="button" className="pc-iconbtn pc-iconbtn--sm pc-iconbtn--danger" onClick={() => handleDelete(user)}
+                                                aria-label={`Excluir ${user.username}`} title="Excluir">
+                                                <PcIcon name="trash" size={16} />
+                                            </button>
+                                        </>
+                                    )}
+                                </div>
+                            </li>
+                        );
+                    })}
+                </ul>
+            )}
+        </section>
     );
 }
 
@@ -1936,7 +1817,6 @@ const PC_ICONS = {
     shield: <><path d="M12 3 4 6v6c0 4.5 3.4 8.3 8 9 4.6-.7 8-4.5 8-9V6z" /><path d="m9 12 2 2 4-4" /></>,
     users: <><circle cx="9" cy="8" r="3.5" /><path d="M2.5 20a6.5 6.5 0 0 1 13 0" /><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6.5 6.5 0 0 1 3.5 6" /></>,
     layout: <><rect x="4" y="4" width="16" height="5" rx="1" /><rect x="4" y="13" width="7" height="7" rx="1" /><rect x="15" y="13" width="5" height="7" rx="1" /></>,
-    wrench: <path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.4-.6-.6-2.4z" />,
     logout: <><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3" /><path d="M10 17l5-5-5-5M15 12H4" /></>,
     close: <path d="M18 6 6 18M6 6l12 12" />,
     menu: <path d="M4 6h16M4 12h16M4 18h16" />,
@@ -1951,7 +1831,21 @@ const PC_ICONS = {
     copy: <><rect x="8" y="8" width="12" height="12" rx="2" /><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3" /></>,
     userPlus: <><circle cx="9" cy="8" r="3.5" /><path d="M2.5 20a6.5 6.5 0 0 1 13 0" /><path d="M19 8v6M16 11h6" /></>,
     grip: <path d="M4 9h16M4 15h16" />,
-    globe: <><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18" /></>
+    globe: <><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18" /></>,
+    expand: <path d="M14 4h6v6M10 20H4v-6M20 4l-6.5 6.5M4 20l6.5-6.5" />,
+    arrowRight: <path d="M5 12h14M13 6l6 6-6 6" />,
+    edit: <><path d="M4 20h4L19 9l-4-4L4 16z" /><path d="m13.5 6.5 4 4" /></>,
+    check: <path d="m5 12 5 5 9-10" />,
+    lock: <><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></>,
+    unlock: <><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 7.5-2" /></>,
+    key: <><circle cx="8" cy="15" r="4" /><path d="m11 12 9-9M17 6l3 3M15 8l2 2" /></>,
+    clock: <><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></>,
+    at: <><circle cx="12" cy="12" r="4" /><path d="M16 12v1.5a2.5 2.5 0 0 0 5 0V12a9 9 0 1 0-3.5 7.1" /></>,
+    trash: <path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" />,
+    sliders: <><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12" /><circle cx="16" cy="6" r="2" /><circle cx="10" cy="12" r="2" /><circle cx="18" cy="18" r="2" /></>,
+    rotate: <><path d="M4 12a8 8 0 1 0 2.3-5.6L4 8.7" /><path d="M4 4v4.7h4.7" /></>,
+    alert: <><circle cx="12" cy="12" r="9" /><path d="M12 8v4M12 16h.01" /></>,
+    chevronLeft: <path d="m15 6-6 6 6 6" />
 };
 
 function PcIcon({ name, size = 20, className, strokeWidth = 2 }) {
@@ -1963,8 +1857,184 @@ function PcIcon({ name, size = 20, className, strokeWidth = 2 }) {
     );
 }
 
+// Folha de um card de grupo da Início. Em vez de um acordeão, o próprio card
+// "se abre": a folha nasce recortada exatamente sobre ele (clip-path + translate,
+// sem distorcer o texto) e cresce até o centro; ao fechar, volta para o card.
+// O card deixa um encaixe vazio na grade enquanto a folha está aberta.
+const pcReducedMotion = () => !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+
+function PcGroupSheet({ groupKey, title, subtitle, accent, icon, items, renderTile, onTrack, onClose }) {
+    const sheetRef = useRef(null);
+    const backdropRef = useRef(null);
+    const closingRef = useRef(false);
+    const titleId = `folha-${groupKey}`;
+
+    const cardEl = () => document.querySelector(`[data-group-card="${groupKey}"]`);
+
+    // Quadros da transformação card <-> folha, medidos na hora (o card pode ter mudado de lugar).
+    const frames = () => {
+        const sheet = sheetRef.current;
+        const card = cardEl();
+        if (!sheet || !card || typeof sheet.animate !== 'function' || pcReducedMotion()) return null;
+        const a = card.getBoundingClientRect();
+        const b = sheet.getBoundingClientRect();
+        const right = Math.max(0, b.width - a.width);
+        const bottom = Math.max(0, b.height - a.height);
+        return [
+            { transform: `translate(${a.left - b.left}px, ${a.top - b.top}px)`, clipPath: `inset(0px ${right}px ${bottom}px 0px round 16px)` },
+            { transform: 'translate(0px, 0px)', clipPath: 'inset(0px 0px 0px 0px round 20px)' }
+        ];
+    };
+
+    useLayoutEffect(() => {
+        const f = frames();
+        if (f) {
+            sheetRef.current.animate(f, { duration: 460, easing: 'cubic-bezier(.2, .85, .25, 1)' });
+            backdropRef.current.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 320, easing: 'ease-out' });
+        }
+        sheetRef.current.querySelector('.pc-sheet-close')?.focus({ preventScroll: true });
+    }, []);
+
+    const close = (after) => {
+        if (closingRef.current) return;
+        closingRef.current = true;
+        const done = () => {
+            // Síncrono: o card precisa estar visível de novo antes de receber o foco.
+            if (ReactDOM.flushSync) ReactDOM.flushSync(onClose); else onClose();
+            if (after) after();
+            else cardEl()?.querySelector('.pc-card-hit')?.focus({ preventScroll: true });
+        };
+        const f = frames();
+        if (!f) return done();
+        backdropRef.current.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 280, easing: 'ease-in', fill: 'forwards' });
+        sheetRef.current.classList.add('is-closing');
+        const anim = sheetRef.current.animate([f[1], f[0]], { duration: 340, easing: 'cubic-bezier(.4, 0, .2, 1)', fill: 'forwards' });
+        anim.onfinish = done;
+    };
+
+    const activate = (item) => {
+        onTrack(item.label);
+        // Interno troca de tela ou abre modal: a folha sai da frente primeiro.
+        if (!item.href) close(item.onSelect);
+    };
+
+    useEffect(() => {
+        const onKey = (e) => {
+            if (e.key === 'Escape') { e.preventDefault(); close(); return; }
+            // Atalho: 1–9 aciona o serviço correspondente.
+            if (/^[1-9]$/.test(e.key) && !e.ctrlKey && !e.metaKey && !e.altKey) {
+                const alvo = sheetRef.current?.querySelectorAll('.pc-sheet-item')[Number(e.key) - 1];
+                if (alvo) { e.preventDefault(); alvo.click(); }
+                return;
+            }
+            if (e.key === 'Tab' && sheetRef.current) {
+                const focaveis = sheetRef.current.querySelectorAll('button, a[href]');
+                if (!focaveis.length) return;
+                const first = focaveis[0];
+                const last = focaveis[focaveis.length - 1];
+                if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+                else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+            }
+        };
+        document.addEventListener('keydown', onKey);
+        return () => document.removeEventListener('keydown', onKey);
+    }, []);
+
+    // Portal: a Início vive num contêiner com transform (fadeInUp), que prenderia o position: fixed.
+    return ReactDOM.createPortal(
+        <div className="pc-sheet-layer">
+            <div ref={backdropRef} className="pc-sheet-backdrop" onClick={() => close()} />
+            <div
+                ref={sheetRef}
+                className="pc-sheet"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby={titleId}
+                style={{ '--accent': accent }}
+            >
+                <div className="pc-sheet-head">
+                    {renderTile(icon)}
+                    <div className="pc-sheet-heading">
+                        <h2 id={titleId} className="pc-sheet-title">{title}</h2>
+                        <p className="pc-sheet-sub">{subtitle}</p>
+                    </div>
+                    <button type="button" className="pc-iconbtn pc-sheet-close" aria-label="Fechar" onClick={() => close()}>
+                        <PcIcon name="close" size={18} />
+                    </button>
+                </div>
+                <div className="pc-sheet-list">
+                    {items.map((item, i) => {
+                        const inner = (
+                            <>
+                                {renderTile(item, 18)}
+                                <span className="pc-sheet-text">
+                                    <span className="pc-sheet-item-title">{item.label}</span>
+                                    {item.desc && <span className="pc-sheet-item-desc">{item.desc}</span>}
+                                </span>
+                                <span className="pc-sheet-meta">
+                                    {i < 9 && <kbd className="pc-kbd" aria-hidden="true">{i + 1}</kbd>}
+                                    <PcIcon name={item.href ? 'arrowOut' : 'arrowRight'} size={16} />
+                                </span>
+                            </>
+                        );
+                        const common = { className: 'pc-sheet-item', style: { '--i': i }, title: item.tag };
+                        return item.href ? (
+                            <a key={item.id} {...common} href={item.href} target="_blank" rel="noopener noreferrer" onClick={() => activate(item)}>
+                                {inner}
+                            </a>
+                        ) : (
+                            <button key={item.id} {...common} type="button" onClick={() => activate(item)}>
+                                {inner}
+                            </button>
+                        );
+                    })}
+                </div>
+                <p className="pc-sheet-hint" aria-hidden="true">
+                    <kbd className="pc-kbd">1</kbd>{items.length > 1 && <>–<kbd className="pc-kbd">{Math.min(items.length, 9)}</kbd></>} abre direto · <kbd className="pc-kbd">Esc</kbd> fecha
+                </p>
+            </div>
+        </div>,
+        document.body
+    );
+}
+
+// Preferência de menu recolhido (só no computador; no celular o menu é gaveta).
+const lerMenuRecolhido = () => {
+    try { return localStorage.getItem('pcSideCollapsed') === '1'; } catch (e) { return false; }
+};
+
 function Sidebar({ currentView, setCurrentView, currentUser, onLogout, sidebarMobileOpen, onCloseSidebar, pendingCount = 0 }) {
     const isAdmin = currentUser?.role === 'admin';
+    const [collapsed, setCollapsed] = useState(lerMenuRecolhido);
+    const [tip, setTip] = useState(null); // rótulo flutuante dos ícones com o menu recolhido
+
+    const alternar = () => setCollapsed(v => {
+        try { localStorage.setItem('pcSideCollapsed', v ? '0' : '1'); } catch (e) { }
+        return !v;
+    });
+
+    useEffect(() => { setTip(null); }, [collapsed]);
+
+    // Atalho "[" alterna o menu (fora de campos de texto).
+    useEffect(() => {
+        const onKey = (e) => {
+            if (e.key !== '[' || e.ctrlKey || e.metaKey || e.altKey) return;
+            const t = e.target;
+            if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+            if (window.matchMedia && !window.matchMedia('(min-width: 768px)').matches) return;
+            e.preventDefault();
+            alternar();
+        };
+        document.addEventListener('keydown', onKey);
+        return () => document.removeEventListener('keydown', onKey);
+    }, []);
+
+    const tipProps = (label) => collapsed ? {
+        onMouseEnter: (e) => { const r = e.currentTarget.getBoundingClientRect(); setTip({ label, x: r.right, y: r.top + r.height / 2 }); },
+        onMouseLeave: () => setTip(null),
+        onFocus: (e) => { const r = e.currentTarget.getBoundingClientRect(); setTip({ label, x: r.right, y: r.top + r.height / 2 }); },
+        onBlur: () => setTip(null)
+    } : {};
 
     const handleNavigate = (view) => {
         setCurrentView(view);
@@ -1981,8 +2051,7 @@ function Sidebar({ currentView, setCurrentView, currentUser, onLogout, sidebarMo
     const adminItems = [
         { id: 'admin-dashboard', label: 'Auditoria', icon: 'shield' },
         { id: 'admin-users', label: 'Usuários', icon: 'users', count: pendingCount },
-        { id: 'admin-banners', label: 'Banners', icon: 'layout' },
-        { id: 'admin-tools', label: 'Ferramentas', icon: 'wrench' }
+        { id: 'admin-banners', label: 'Banners', icon: 'layout' }
     ];
 
     const renderItem = (item) => {
@@ -1994,9 +2063,11 @@ function Sidebar({ currentView, setCurrentView, currentUser, onLogout, sidebarMo
                 onClick={() => handleNavigate(item.id)}
                 className={`pc-nav-item ${active ? 'is-active' : ''}`}
                 aria-current={active ? 'page' : undefined}
+                aria-label={collapsed ? item.label : undefined}
+                {...tipProps(item.label)}
             >
                 <PcIcon name={item.icon} />
-                {item.label}
+                <span className="pc-fade pc-nav-text">{item.label}</span>
                 {item.count > 0 && (
                     <span className="pc-nav-count" aria-label={`${item.count} pendente${item.count === 1 ? '' : 's'}`}>{item.count}</span>
                 )}
@@ -2005,12 +2076,13 @@ function Sidebar({ currentView, setCurrentView, currentUser, onLogout, sidebarMo
     };
 
     return (
-        <aside className={`pc-side ${sidebarMobileOpen ? 'is-open' : ''}`} aria-label="Menu lateral">
+        <div className={`pc-side-wrap ${collapsed ? 'is-collapsed' : ''}`}>
+        <aside id="menu-lateral" className={`pc-side ${sidebarMobileOpen ? 'is-open' : ''}`} aria-label="Menu lateral">
             <div className="pc-side-brand">
                 <div className="pc-side-mark">
                     <img src="image/ecossistema3.png" alt="" />
                 </div>
-                <div className="min-w-0">
+                <div className="min-w-0 pc-fade">
                     <p className="pc-side-title">Painel DIAAF</p>
                     <p className="pc-side-sub">Ecossistema digital</p>
                 </div>
@@ -2025,22 +2097,39 @@ function Sidebar({ currentView, setCurrentView, currentUser, onLogout, sidebarMo
 
             {isAdmin && (
                 <nav className="pc-nav" aria-label="Administração">
-                    <span className="pc-nav-label">Administração</span>
+                    <span className="pc-nav-label"><span className="pc-fade">Administração</span></span>
                     {adminItems.map(renderItem)}
                 </nav>
             )}
 
-            <div className="pc-side-user">
+            <div className="pc-side-user" {...tipProps(currentUser?.name || currentUser?.username || 'Usuário')}>
                 <span className="pc-avatar" aria-hidden="true">{iniciaisDe(currentUser)}</span>
-                <div className="min-w-0 flex-1">
+                <div className="min-w-0 flex-1 pc-fade">
                     <p className="pc-side-user-name">{currentUser?.name || currentUser?.username || 'Usuário'}</p>
                     <p className="pc-side-user-role">{isAdmin ? 'Administrador' : 'Usuário'}</p>
                 </div>
-                <button type="button" onClick={onLogout} className="pc-iconbtn" style={{ border: 0, width: '2.5rem', height: '2.5rem' }} aria-label="Sair" title="Sair">
+                <button type="button" onClick={onLogout} className="pc-iconbtn pc-side-logout" style={{ border: 0, width: '2.5rem', height: '2.5rem' }} aria-label="Sair" title="Sair" tabIndex={collapsed ? -1 : undefined}>
                     <PcIcon name="logout" size={18} />
                 </button>
             </div>
         </aside>
+
+        <button
+            type="button"
+            className="pc-side-toggle"
+            onClick={alternar}
+            aria-controls="menu-lateral"
+            aria-expanded={!collapsed}
+            aria-label={collapsed ? 'Expandir menu' : 'Recolher menu'}
+            title={`${collapsed ? 'Expandir' : 'Recolher'} menu  [`}
+        >
+            <PcIcon name="chevronLeft" size={14} strokeWidth={2.5} />
+        </button>
+
+        {collapsed && tip && (
+            <span className="pc-side-tip" role="tooltip" style={{ left: tip.x + 10, top: tip.y }}>{tip.label}</span>
+        )}
+        </div>
     );
 }
 
@@ -2317,7 +2406,7 @@ const iniciaisDe = (user) =>
 // Agrupamento da Início. A ordem dentro de cada seção continua sendo a do
 // admin (drag & drop); um banner fora destas listas cai em "Outros serviços".
 const HOME_SECTIONS = [
-    { id: 'fiscal', title: 'Fiscal e tributário', keys: ['iss-cnae', 'pareceres', 'processos', 'painel-distribuicao', 'nfse-nacional', 'receita'] },
+    { id: 'fiscal', title: 'Fiscal e tributário', keys: ['pareceres', 'processos', 'painel-distribuicao', 'nfse-nacional', 'receita'] },
     { id: 'municipio', title: 'Município e portais', keys: ['dte', 'diario-oficial', 'arrecadacao', 'entes', 'empresa-facil', 'biblioteca'] }
 ];
 
@@ -2332,8 +2421,7 @@ const VIEW_TITLES = {
     'other-services': 'Serviços Internos',
     'admin-dashboard': 'Auditoria',
     'admin-users': 'Usuários',
-    'admin-banners': 'Banners',
-    'admin-tools': 'Ferramentas'
+    'admin-banners': 'Banners'
 };
 
 const dataPorExtenso = () => {
@@ -2348,21 +2436,6 @@ const saudacao = () => {
 
 // Config estática dos banners (UI, cores, links)
 const BANNER_STATIC = {
-    'iss-cnae': {
-        label: 'Consultas Fiscais',
-        menu: 'home',
-        accent: 'blue',
-        size: 'hero',
-        description: 'Acesse os serviços de consulta fiscal',
-        icon: 'M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z',
-        light: 'from-blue-50 to-purple-50 border-blue-400 hover:border-blue-500',
-        dark: 'from-blue-900/50 to-purple-900/50 border-blue-500/30 hover:border-blue-500',
-        iconLight: 'bg-white text-blue-600 shadow-md',
-        iconDark: 'bg-blue-500/20 text-blue-400',
-        hoverBg: { light: 'bg-blue-600', dark: 'bg-white' },
-        isModal: true,
-        modalId: 'consultas-fiscais'
-    },
     'pareceres': {
         label: 'Gerador de Pareceres',
         menu: 'home',
@@ -2530,6 +2603,7 @@ const BANNER_STATIC = {
     'sistema-ponto': {
         label: 'Sistema de Ponto',
         menu: 'outros',
+        accent: 'blue',
         description: 'Acesse o sistema de registro de ponto eletrônico',
         href: 'https://imperatriz.ma.gov.br/sistema-de-ponto/entrar/',
         icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z',
@@ -2541,6 +2615,7 @@ const BANNER_STATIC = {
     'contra-cheque': {
         label: 'Contra-cheque',
         menu: 'outros',
+        accent: 'emerald',
         description: 'Consulte e emita seus contra-cheques mensais',
         href: 'https://servicos.imperatriz.ma.gov.br/portaldoservidor/login.php',
         icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z',
@@ -2552,6 +2627,7 @@ const BANNER_STATIC = {
     'justificativas-ponto': {
         label: 'Justificativas de Ponto',
         menu: 'outros',
+        accent: 'amber',
         description: 'Acesso via INTRANET sefazgo',
         href: 'https://protocolo.imperatriz.ma.gov.br/menu',
         icon: 'M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z',
@@ -2624,25 +2700,6 @@ const BANNER_STATIC = {
         href: 'https://www.sistematerra.com.br/otobo/customer.pl',
         icon: 'M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 12.728l-3.536-3.536M12 3v4m0 10v4m9-9h-4M7 12H3m8 0a1 1 0 102 0 1 1 0 00-2-2 0z',
         light: 'from-cyan-50 to-sky-50 border-cyan-200 hover:border-cyan-300', dark: 'from-cyan-900/40 to-sky-900/40 border-cyan-500/30 hover:border-cyan-400', iconLight: 'bg-cyan-100 text-cyan-600', iconDark: 'bg-cyan-500/20 text-cyan-400'
-    },
-    // --- Sub-Banners Consultas Fiscais ---
-    'consultas-iss-cnae': {
-        label: 'Consulta ISS / CNAE',
-        menu: 'consultas-sub',
-        description: 'Pesquise alíquotas e códigos de serviço rapidamente',
-        isInternal: true,
-        view: 'search',
-        icon: 'M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z',
-        light: 'from-blue-50 to-indigo-50 border-blue-400 hover:border-blue-500', dark: 'from-blue-900/40 to-indigo-900/40 border-blue-500/30 hover:border-blue-400', iconLight: 'bg-blue-100 text-blue-600', iconDark: 'bg-blue-500/20 text-blue-400'
-    },
-    'consultas-nfse-nacional': {
-        label: 'Consulta NFS-e Nacional',
-        menu: 'consultas-sub',
-        description: 'Consulta Pública de NFS-e (Nota Fiscal de Serviços Eletrônica)',
-        isInternal: false,
-        href: 'https://www.nfse.gov.br/consultapublica',
-        icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z',
-        light: 'from-cyan-50 to-sky-50 border-cyan-400 hover:border-cyan-500', dark: 'from-cyan-900/40 to-sky-900/40 border-cyan-500/30 hover:border-cyan-400', iconLight: 'bg-cyan-100 text-cyan-600', iconDark: 'bg-cyan-500/20 text-cyan-400'
     }
 };
 
@@ -2657,10 +2714,6 @@ const DEFAULT_BANNERS = Object.keys(BANNER_STATIC).map((key, index) => ({
 // ==================== LISTAS AUXILIARES DE SUB-BANNERS ====================
 const DTE_SUB_BANNERS_KEYS = [
     'dte-portal', 'dte-meuiss', 'dte-nfe', 'dte-iptu', 'dte-meuiptu', 'dte-login', 'dte-simples-fiscal', 'dte-helpdesk'
-];
-
-const CONSULTAS_FISCAIS_SUB_BANNERS_KEYS = [
-    'consultas-iss-cnae', 'consultas-nfse-nacional'
 ];
 
 
@@ -2750,12 +2803,12 @@ function AdminUserBannersModal({ userId, userName, darkMode, onClose }) {
             const data = await ApiService.adminGetUserBanners(userId);
 
             const allKeys = Object.keys(BANNER_STATIC);
-            const merged = [...data];
+            const merged = data.filter(b => BANNER_STATIC[b.key]);
 
             allKeys.forEach(key => {
                 if (!merged.find(b => b.key === key)) {
                     const mapped = BANNER_STATIC[key];
-                    if (['home', 'dte-sub', 'consultas-sub', 'outros'].includes(mapped.menu)) {
+                    if (['home', 'dte-sub', 'outros'].includes(mapped.menu)) {
                         merged.push({
                             id: key,
                             key: key,
@@ -2767,7 +2820,7 @@ function AdminUserBannersModal({ userId, userName, darkMode, onClose }) {
                 }
             });
 
-            const menuOrder = { 'home': 1, 'outros': 2, 'dte-sub': 3, 'consultas-sub': 4 };
+            const menuOrder = { 'home': 1, 'outros': 2, 'dte-sub': 3 };
             setBanners(merged.sort((a, b) => {
                 const ma = BANNER_STATIC[a.key]?.menu || 'home';
                 const mb = BANNER_STATIC[b.key]?.menu || 'home';
@@ -2839,124 +2892,92 @@ function AdminUserBannersModal({ userId, userName, darkMode, onClose }) {
 
     const hasAnyOverride = banners.some(b => b.hasOverride);
 
+    useEffect(() => {
+        const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+        document.addEventListener('keydown', onKey);
+        return () => document.removeEventListener('keydown', onKey);
+    }, [onClose]);
+
+    const GRUPOS = { home: 'Início', outros: 'Serviços internos', 'dte-sub': 'Dentro de Prefeitura Moderna' };
+
     return ReactDOM.createPortal(
-        <div
-            className="fixed inset-0 overflow-y-auto"
-            style={{ backgroundColor: 'rgba(0,0,0,0.7)', zIndex: 9999 }}
-            onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
-        >
-            <div className="flex items-center justify-center min-h-full p-6">
-                <div className={`relative w-full max-w-md flex flex-col rounded-2xl shadow-2xl ${darkMode ? 'bg-gray-900 border border-gray-700' : 'bg-white border border-gray-100'}`} style={{ maxHeight: '70vh' }} onClick={(e) => e.stopPropagation()}>
-                    {/* Header */}
-                    <div className={`flex items-center justify-between p-5 border-b ${darkMode ? 'border-gray-700' : 'border-gray-100'}`}>
-                        <div>
-                            <h3 className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                                🎛️ Banners de <span className={darkMode ? 'text-blue-400' : 'text-blue-600'}>{userName}</span>
-                            </h3>
-                            <p className={`text-xs mt-0.5 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                                {hasAnyOverride ? 'Configuração personalizada ativa' : 'Seguindo padrão global'}
-                            </p>
-                        </div>
-                        <button
-                            onClick={onClose}
-                            className={`p-2 rounded-lg transition-all ${darkMode ? 'hover:bg-gray-800 text-gray-400 hover:text-white' : 'hover:bg-gray-100 text-gray-500 hover:text-gray-800'}`}
-                        >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                        </button>
+        <div className="pc-sheet-layer">
+            <div className="pc-sheet-backdrop" onClick={onClose} />
+            <div className="pc-sheet pc-sheet--narrow" role="dialog" aria-modal="true" aria-labelledby="banners-usuario-titulo" style={{ '--accent': 'var(--pc-brand)' }}>
+                <div className="pc-sheet-head">
+                    <span className="pc-tile"><PcIcon name="sliders" size={20} /></span>
+                    <div className="pc-sheet-heading">
+                        <h2 id="banners-usuario-titulo" className="pc-sheet-title">Banners de {userName}</h2>
+                        <p className="pc-sheet-sub">{hasAnyOverride ? 'Configuração personalizada ativa' : 'Seguindo o padrão global'}</p>
                     </div>
+                    <button type="button" className="pc-iconbtn pc-sheet-close" aria-label="Fechar" onClick={onClose} autoFocus>
+                        <PcIcon name="close" size={18} />
+                    </button>
+                </div>
 
-                    {/* Toast */}
-                    {toast && (
-                        <div className={`mx-5 mt-4 px-4 py-2.5 rounded-xl text-sm font-medium flex items-center gap-2 ${toast.type === 'success' ? (darkMode ? 'bg-green-900/40 text-green-300 border border-green-700' : 'bg-green-50 text-green-800 border border-green-200') : (darkMode ? 'bg-red-900/40 text-red-300 border border-red-700' : 'bg-red-50 text-red-800 border border-red-200')}`}>
-                            {toast.type === 'success' ? '✅' : '❌'} {toast.msg}
-                        </div>
-                    )}
+                {toast && (
+                    <div className={`pc-alert ${toast.type === 'success' ? 'pc-alert--ok' : 'pc-alert--error'}`} role="status" style={{ margin: '0 1.125rem .75rem' }}>
+                        <PcIcon name={toast.type === 'success' ? 'check' : 'alert'} size={18} />
+                        <span>{toast.msg}</span>
+                    </div>
+                )}
 
-                    {/* Lista de banners */}
-                    <div className="flex-1 overflow-y-auto p-5 custom-scrollbar">
-                        {loading ? (
-                            <div className="flex justify-center items-center py-12">
-                                <div className="animate-spin rounded-full h-8 w-8 border-4 border-blue-200 border-t-blue-600"></div>
-                            </div>
-                        ) : (
-                            <div className="flex flex-col gap-2">
-                                {banners.map((banner, index) => {
-                                    const s = BANNER_STATIC[banner.key];
-                                    if (!s) return null;
-                                    const isSaving = savingId === banner.id;
-
-                                    const prevS = index > 0 ? BANNER_STATIC[banners[index - 1].key] : null;
-                                    const isNewGroup = !prevS || s.menu !== prevS.menu;
-
-                                    const groupTitles = {
-                                        'home': 'Banners Principais',
-                                        'outros': 'Serviços Adicionais',
-                                        'dte-sub': 'Sub-itens: Prefeitura Moderna',
-                                        'consultas-sub': 'Sub-itens: Consultas Fiscais'
-                                    };
-
-                                    return (
-                                        <React.Fragment key={banner.id}>
-                                            {isNewGroup && (
-                                                <div className={`text-[10px] font-bold uppercase tracking-widest mt-4 mb-2 px-1 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>
-                                                    {groupTitles[s.menu] || 'Geral'}
-                                                </div>
+                <div className="pc-sheet-scroll">
+                    {loading ? (
+                        <div className="pc-loading"><span className="pc-spin" aria-hidden="true" />Carregando banners…</div>
+                    ) : (
+                        banners.map((banner, index) => {
+                            const s = BANNER_STATIC[banner.key];
+                            if (!s) return null;
+                            const isSaving = savingId === banner.id;
+                            const prevS = index > 0 ? BANNER_STATIC[banners[index - 1].key] : null;
+                            const isNewGroup = !prevS || s.menu !== prevS.menu;
+                            const label = s.label || banner.label;
+                            return (
+                                <React.Fragment key={banner.id}>
+                                    {isNewGroup && <p className="pc-eyebrow pc-sheet-group">{GRUPOS[s.menu] || 'Geral'}</p>}
+                                    <div
+                                        className={`pc-brow ${banner.enabled ? '' : 'is-off'}`}
+                                        draggable
+                                        onDragStart={() => dragItem.current = index}
+                                        onDragEnter={() => dragOverItem.current = index}
+                                        onDragEnd={handleSort}
+                                        onDragOver={e => e.preventDefault()}
+                                    >
+                                        <span className="pc-brow-grip" title="Arraste para reordenar"><PcIcon name="grip" size={16} /></span>
+                                        <span className={`pc-tile ${s.imageIcon ? 'pc-tile--img' : ''}`} style={{ '--accent': mosaicAccent(s.accent, darkMode) }}>
+                                            {s.imageIcon ? <img src={s.imageIcon} alt="" /> : (
+                                                <svg width={18} height={18} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d={s.icon || 'M4 5h16'} />
+                                                </svg>
                                             )}
-                                            <div
-                                                draggable
-                                                onDragStart={() => dragItem.current = index}
-                                                onDragEnter={() => dragOverItem.current = index}
-                                                onDragEnd={handleSort}
-                                                onDragOver={e => e.preventDefault()}
-                                                className={`flex items-center p-3.5 rounded-xl border transition-all duration-200 cursor-move ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100 shadow-sm hover:shadow-md'} ${!banner.enabled ? 'opacity-60' : ''}`}
-                                            >
-                                                <div className="text-gray-400 px-1.5 mr-1 cursor-grab">
-                                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" /></svg>
-                                                </div>
+                                        </span>
+                                        <div className="pc-row-main">
+                                            <span className="pc-row-name">{label}</span>
+                                            <span className="pc-row-sub">{banner.enabled ? 'Visível' : 'Oculto'}</span>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            role="switch"
+                                            aria-checked={!!banner.enabled}
+                                            aria-label={`${banner.enabled ? 'Ocultar' : 'Mostrar'} ${label}`}
+                                            className={`pc-switch ${banner.enabled ? 'is-on' : ''} ${isSaving ? 'is-busy' : ''}`}
+                                            onClick={() => handleToggle(banner)}
+                                            disabled={isSaving}
+                                        />
+                                    </div>
+                                </React.Fragment>
+                            );
+                        })
+                    )}
+                </div>
 
-                                                <div className={`w-10 h-10 rounded-full flex-shrink-0 flex items-center justify-center mr-3 ${darkMode ? s.iconDark : s.iconLight} overflow-hidden shadow-inner pointer-events-none`}>
-                                                    {s.imageIcon ? (
-                                                        <img src={s.imageIcon} alt="" className={s.imageClass || 'w-full h-full object-contain p-1.5'} />
-                                                    ) : (
-                                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={s.icon || 'M4 5h16'} />
-                                                        </svg>
-                                                    )}
-                                                </div>
-
-                                                <div className="flex-1 min-w-0">
-                                                    <div className="flex items-center gap-2">
-                                                        <span className={`font-semibold text-sm truncate ${darkMode ? 'text-white' : 'text-gray-900'}`}>{s.label || banner.label}</span>
-                                                    </div>
-                                                    <p className={`text-[10px] mt-0.5 ${banner.enabled ? (darkMode ? 'text-green-400' : 'text-green-600') : (darkMode ? 'text-gray-500' : 'text-gray-400')}`}>
-                                                        {banner.enabled ? '● Visível' : '● Oculto'}
-                                                    </p>
-                                                </div>
-
-                                                <button
-                                                    onClick={() => handleToggle(banner)}
-                                                    disabled={isSaving}
-                                                    className={`relative flex-shrink-0 ml-3 inline-flex h-6 w-11 items-center rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 ${banner.enabled ? 'bg-blue-600' : (darkMode ? 'bg-gray-600' : 'bg-gray-200')} ${isSaving ? 'opacity-50 cursor-wait' : 'cursor-pointer'}`}
-                                                >
-                                                    <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition duration-200 ease-in-out flex items-center justify-center ${banner.enabled ? 'translate-x-5' : 'translate-x-0'}`}>
-                                                        {isSaving && <div className="w-3 h-3 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin"></div>}
-                                                    </span>
-                                                </button>
-                                            </div>
-                                        </React.Fragment>
-                                    );
-                                })}
-                            </div>
-                        )}
-                    </div>
-
-                    <div className={`p-4 border-t text-center ${darkMode ? 'border-gray-700' : 'border-gray-100'}`}>
-                        <p className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>
-                            Arraste para reordenar
-                        </p>
-                    </div>
+                <div className="pc-sheet-foot">
+                    <span>Arraste para reordenar</span>
+                    <button type="button" className="pc-btn pc-btn--sm" onClick={handleReset} disabled={!hasAnyOverride || resetting}>
+                        <PcIcon name="rotate" size={15} />
+                        {resetting ? 'Restaurando…' : 'Restaurar padrão'}
+                    </button>
                 </div>
             </div>
         </div>,
@@ -2994,9 +3015,14 @@ function AdminBannersPanel({ darkMode }) {
         setTimeout(() => setToast(null), 3500);
     };
 
+    const [filtro, setFiltro] = useState('');
+    const termo = filtro.trim().toLowerCase();
+    const visiveis = users.filter(u => !termo
+        || (u.name || '').toLowerCase().includes(termo)
+        || (u.username || '').toLowerCase().includes(termo));
+
     return (
-        <div className="animate-fadeInUp">
-            {/* Modal de banners por usuário */}
+        <div className="pc-page animate-fadeInUp">
             {selectedUserModal && (
                 <AdminUserBannersModal
                     userId={selectedUserModal.id}
@@ -3006,76 +3032,61 @@ function AdminBannersPanel({ darkMode }) {
                 />
             )}
 
-            {/* Header */}
-            <div className={`mb-6 p-5 rounded-2xl ${darkMode ? 'bg-gray-800 border border-gray-700' : 'bg-white border border-gray-100 shadow-sm'}`}>
-                <div className="flex items-center gap-4">
-                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${darkMode ? 'bg-blue-900/30 text-blue-400' : 'bg-blue-50 text-blue-600'}`}>
-                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-                        </svg>
-                    </div>
-                    <div>
-                        <h2 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Gerenciador de Banners</h2>
-                        <p className={`text-sm mt-0.5 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Personalize a visibilidade dos banners para cada usuário.</p>
-                    </div>
+            <header className="pc-page-head">
+                <div>
+                    <h1 className="pc-page-title">Banners</h1>
+                    <p className="pc-page-lead">Escolha quais módulos cada usuário vê na Início e em Serviços Internos. Sem personalização, vale o padrão global.</p>
                 </div>
-            </div>
+            </header>
 
-            {/* Toast */}
             {toast && (
-                <div className={`mb-6 px-4 py-3 rounded-xl text-sm font-medium flex items-center gap-2 animate-fadeInDown ${toast.type === 'success'
-                    ? (darkMode ? 'bg-green-900/40 text-green-300 border border-green-700' : 'bg-green-50 text-green-800 border border-green-200')
-                    : (darkMode ? 'bg-red-900/40 text-red-300 border border-red-700' : 'bg-red-50 text-red-800 border border-red-200')
-                    }`}>
-                    {toast.type === 'success' ? '✅' : '❌'} {toast.msg}
+                <div className={`pc-alert ${toast.type === 'success' ? 'pc-alert--ok' : 'pc-alert--error'}`} role="status">
+                    <PcIcon name={toast.type === 'success' ? 'check' : 'alert'} size={18} />
+                    <span>{toast.msg}</span>
                 </div>
             )}
 
-            {/* Titulo Usuários */}
-            <h3 className={`font-bold mb-4 ${darkMode ? 'text-white' : 'text-gray-800'}`}>Personalização de Usuários</h3>
-
-            {/* Lista de Usuários */}
-            {loadingUsers ? (
-                <div className="flex justify-center items-center py-16">
-                    <div className="animate-spin rounded-full h-8 w-8 border-4 border-blue-200 border-t-blue-600"></div>
-                </div>
-            ) : users.length === 0 ? (
-                <div className={`flex flex-col items-center justify-center py-16 gap-3 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>
-                    <svg className="w-12 h-12 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                    <p className="text-sm font-medium">Nenhum usuário autorizado encontrado.</p>
-                </div>
-            ) : (
-                <div className="flex flex-col gap-3">
-                    <div className={`px-4 py-3 rounded-xl text-sm flex items-start gap-2 ${darkMode ? 'bg-blue-900/20 text-blue-300 border border-blue-700/30' : 'bg-blue-50 text-blue-800 border border-blue-200'}`}>
-                        💡 <span>Clique em <strong>Gerenciar Banners</strong> para personalizar a visibilidade de cada banner por usuário.</span>
+            <section className="pc-box" aria-labelledby="banners-usuarios">
+                <div className="pc-box-head">
+                    <div>
+                        <h2 id="banners-usuarios" className="pc-box-title">Personalização por usuário</h2>
+                        <p className="pc-box-sub">{users.length} {users.length === 1 ? 'usuário autorizado' : 'usuários autorizados'}</p>
                     </div>
-                    {users.map(user => (
-                        <div
-                            key={user.id}
-                            className={`flex items-center gap-4 p-4 rounded-xl border transition-all ${darkMode ? 'bg-gray-800 border-gray-700 hover:border-gray-600' : 'bg-white border-gray-100 shadow-sm hover:shadow-md'}`}
-                        >
-                            <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-white text-base shadow-md ${darkMode ? 'bg-blue-700' : 'bg-blue-500'}`}>
-                                {(user.name || user.username)?.charAt(0).toUpperCase()}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                                <p className={`font-semibold truncate ${darkMode ? 'text-white' : 'text-gray-900'}`}>{user.name || user.username}</p>
-                                <p className={`text-xs truncate ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>@{user.username}</p>
-                            </div>
-                            <button
-                                onClick={() => setSelectedUserModal({ id: user.id, name: user.name || user.username })}
-                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 flex-shrink-0 ${darkMode ? 'bg-blue-600/20 text-blue-400 hover:bg-blue-600/40 border border-blue-600/30' : 'bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200'}`}
-                            >
-                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
-                                </svg>
-                                Gerenciar Banners
-                            </button>
-                        </div>
-                    ))}
+                    <div className="pc-input pc-input--sm pc-box-search">
+                        <PcIcon name="search" size={16} />
+                        <label htmlFor="banners-filtro" className="pc-sr-only">Filtrar usuários</label>
+                        <input id="banners-filtro" type="search" value={filtro} onChange={(e) => setFiltro(e.target.value)} placeholder="Filtrar por nome ou usuário" />
+                    </div>
                 </div>
-            )}
+
+                {loadingUsers ? (
+                    <div className="pc-loading"><span className="pc-spin" aria-hidden="true" />Carregando usuários…</div>
+                ) : visiveis.length === 0 ? (
+                    <div className="pc-empty">
+                        <span className="pc-empty-ico"><PcIcon name="users" /></span>
+                        <strong>{termo ? 'Nenhum usuário encontrado' : 'Nenhum usuário autorizado'}</strong>
+                        <span>{termo ? `Nada corresponde a “${filtro}”.` : 'Usuários aparecem aqui depois de autorizados em Usuários.'}</span>
+                    </div>
+                ) : (
+                    <ul className="pc-rows">
+                        {visiveis.map(user => (
+                            <li key={user.id} className="pc-row">
+                                <span className="pc-avatar">{(user.name || user.username || '?').charAt(0).toUpperCase()}</span>
+                                <div className="pc-row-main">
+                                    <span className="pc-row-name">{user.name || user.username}</span>
+                                    <span className="pc-row-sub pc-mono">@{user.username}</span>
+                                </div>
+                                <div className="pc-row-actions">
+                                    <button type="button" className="pc-btn pc-btn--sm" onClick={() => setSelectedUserModal({ id: user.id, name: user.name || user.username })}>
+                                        <PcIcon name="sliders" size={15} />
+                                        Personalizar
+                                    </button>
+                                </div>
+                            </li>
+                        ))}
+                    </ul>
+                )}
+            </section>
         </div>
     );
 }
@@ -3458,7 +3469,7 @@ function App() {
     const [bibliotecaModalOpen, setBibliotecaModalOpen] = useState(false);
     const [bibliotecaCategoria, setBibliotecaCategoria] = useState(null);
     const [bibliotecaSearch, setBibliotecaSearch] = useState('');
-    const [openGroup, setOpenGroup] = useState('iss-cnae'); // card de grupo aberto no accordion da Início
+    const [openGroup, setOpenGroup] = useState(null); // card de grupo aberto como folha na Início
 
     const handleSortBanners = async () => {
         if (!currentUser || currentUser.role !== 'admin') return;
@@ -3498,6 +3509,7 @@ function App() {
     const [isReorderingBanners, setIsReorderingBanners] = useState(false);
     const [isDraggingBanners, setIsDraggingBanners] = useState(false); // New state for global CSS
     const [dragOverBannerId, setDragOverBannerId] = useState(null); // Card sob o cursor durante o arraste
+    const dragSection = useRef(null); // Seção do card arrastado: só aceita soltar dentro dela
 
     const [freezeModalBanner, setFreezeModalBanner] = useState(null);
 
@@ -3509,7 +3521,7 @@ function App() {
                 .then(data => {
                     // Mescla banners da API com os defaults para garantir que novos banners apareçam
                     // mesmo se o backend estiver desatualizado (sem restart)
-                    const merged = [...data];
+                    const merged = data.filter(b => BANNER_STATIC[b.key]);
                     DEFAULT_BANNERS.forEach(def => {
                         if (!merged.find(b => b.key === def.key)) {
                             merged.push(def);
@@ -3528,7 +3540,7 @@ function App() {
     const reloadBanners = () => {
         ApiService.getBanners()
             .then(data => {
-                const merged = [...data];
+                const merged = data.filter(b => BANNER_STATIC[b.key]);
                 DEFAULT_BANNERS.forEach(def => {
                     if (!merged.find(b => b.key === def.key)) {
                         merged.push(def);
@@ -4386,10 +4398,13 @@ function App() {
                             />
                         )}
 
-                        {currentView === 'home' && (() => {
+                        {(currentView === 'home' || currentView === 'outros' || currentView === 'other-services') && (() => {
+                            // Início e Serviços Internos usam o mesmo painel de módulos.
+                            const menu = currentView === 'home' ? 'home' : 'outros';
                             const isAdmin = currentUser?.role === 'admin';
                             const homeBanners = bannerConfig
-                                .filter(b => (BANNER_STATIC[b.key]?.menu || 'home') === 'home')
+                                .filter(b => BANNER_STATIC[b.key])
+                                .filter(b => (BANNER_STATIC[b.key].menu || 'home') === menu)
                                 .filter(b => isAdmin || b.enabled);
 
                             const track = (label) => updateStatistics('bannerClick', {
@@ -4397,11 +4412,9 @@ function App() {
                                 user: currentUser ? currentUser.username : 'Visitante'
                             });
 
-                            // Subserviços de um card de grupo (accordion). Lista completa, nunca truncada.
+                            // Subserviços de um card de grupo (abertos na folha). Lista completa, nunca truncada.
                             const subItemsFor = (banner, s) => {
-                                const keys = banner.key === 'dte' ? DTE_SUB_BANNERS_KEYS
-                                    : banner.key === 'iss-cnae' ? CONSULTAS_FISCAIS_SUB_BANNERS_KEYS
-                                        : [];
+                                const keys = banner.key === 'dte' ? DTE_SUB_BANNERS_KEYS : [];
                                 if (keys.length) {
                                     return keys
                                         .filter(k => bannerConfig.find(bc => bc.key === k)?.enabled !== false)
@@ -4451,7 +4464,7 @@ function App() {
                                 </span>
                             );
 
-                            const renderCard = (banner, index) => {
+                            const renderCard = (banner, index, secId) => {
                                 const s = BANNER_STATIC[banner.key];
                                 if (!s) return null;
                                 const isDisabledForUser = !banner.enabled && !isAdmin;
@@ -4466,25 +4479,44 @@ function App() {
                                 const construcao = banner.freezeReason === 'construction';
 
                                 // Índice no bannerConfig completo: é ele que handleSortBanners reordena.
+                                // A seção vem de HOME_SECTIONS (fixa), então o arraste só vale dentro
+                                // da própria seção; fora dela o card não é destino de soltura.
                                 const configIndex = bannerConfig.findIndex(b => b.id === banner.id);
+                                const mesmaSecao = () => dragSection.current === secId;
                                 const dragProps = isAdmin ? {
                                     draggable: true,
                                     onDragStart: (e) => {
                                         dragItem.current = configIndex;
+                                        dragSection.current = secId;
+                                        e.dataTransfer.effectAllowed = 'move';
+                                        e.dataTransfer.setData('text/plain', banner.key); // Firefox só inicia o arraste com dados
                                         e.currentTarget.classList.add('opacity-50');
                                         setIsDraggingBanners(true);
                                     },
                                     onDragEnter: () => {
+                                        if (!mesmaSecao()) {
+                                            dragOverItem.current = null;
+                                            setDragOverBannerId(null);
+                                            return;
+                                        }
                                         dragOverItem.current = configIndex;
                                         setDragOverBannerId(banner.id);
                                     },
+                                    onDragOver: (e) => {
+                                        if (!mesmaSecao()) return; // sem preventDefault: cursor de "proibido"
+                                        e.preventDefault();
+                                        e.dataTransfer.dropEffect = 'move';
+                                    },
+                                    onDrop: (e) => e.preventDefault(),
                                     onDragEnd: (e) => {
+                                        // Solto fora de um card válido (ou Esc): não reordena.
+                                        if (e.dataTransfer.dropEffect === 'none') dragOverItem.current = null;
                                         e.currentTarget.classList.remove('opacity-50');
+                                        dragSection.current = null;
                                         setIsDraggingBanners(false);
                                         setDragOverBannerId(null);
                                         handleSortBanners();
-                                    },
-                                    onDragOver: (e) => e.preventDefault()
+                                    }
                                 } : {};
 
                                 // Ação principal: um único elemento interativo, esticado sobre o card.
@@ -4495,9 +4527,9 @@ function App() {
                                             <button
                                                 type="button"
                                                 className="pc-card-hit"
+                                                aria-haspopup="dialog"
                                                 aria-expanded={isOpen}
-                                                aria-controls={`grupo-${banner.key}`}
-                                                onClick={() => setOpenGroup(isOpen ? null : banner.key)}
+                                                onClick={() => setOpenGroup(banner.key)}
                                             >
                                                 {label}
                                             </button>
@@ -4531,8 +4563,9 @@ function App() {
                                 return (
                                     <div
                                         key={banner.id}
-                                        className={`pc-card ${isInert ? 'is-inert' : ''} ${isDisabledForUser ? 'is-muted' : ''} ${isOpen ? 'is-open' : ''} ${isDropTarget ? 'is-drop-target' : ''} ${isAdmin ? 'is-admin' : ''}`}
+                                        className={`pc-card ${isGroup ? 'is-deck' : ''} ${isInert ? 'is-inert' : ''} ${isDisabledForUser ? 'is-muted' : ''} ${isOpen ? 'is-open' : ''} ${isDropTarget ? 'is-drop-target' : ''} ${isAdmin ? 'is-admin' : ''}`}
                                         style={{ '--accent': mosaicAccent(s.accent, darkMode), '--i': Math.min(index, 11) }}
+                                        data-group-card={isGroup ? banner.key : undefined}
                                         {...dragProps}
                                     >
                                         <div className="pc-card-head">
@@ -4573,8 +4606,16 @@ function App() {
                                         <div className={`pc-card-foot ${isGroup ? 'is-group' : ''}`}>
                                             {isGroup ? (
                                                 <>
-                                                    {subItems.length} {unidade(banner)}
-                                                    <PcIcon name="chevron" size={18} className="pc-chev" />
+                                                    <span className="pc-peek" aria-hidden="true">
+                                                        {subItems.slice(0, 4).map(item => (
+                                                            <React.Fragment key={item.id}>{tile(item, 13)}</React.Fragment>
+                                                        ))}
+                                                        {subItems.length > 4 && <span className="pc-peek-more">+{subItems.length - 4}</span>}
+                                                    </span>
+                                                    <span className="pc-peek-label">
+                                                        {subItems.length} {unidade(banner)}
+                                                        <PcIcon name="expand" size={15} />
+                                                    </span>
                                                 </>
                                             ) : (
                                                 <>
@@ -4595,46 +4636,10 @@ function App() {
                                 );
                             };
 
-                            const renderPanel = (banner) => {
-                                const s = BANNER_STATIC[banner.key];
-                                const items = subItemsFor(banner, s);
-                                return (
-                                    <div className="pc-panel" id={`grupo-${banner.key}`} style={{ '--accent': mosaicAccent(s.accent, darkMode) }}>
-                                        <div className="pc-panel-head">
-                                            <div>
-                                                <h3 className="pc-panel-title">{s.label || banner.label}</h3>
-                                                <p className="pc-panel-sub">{items.length} {unidade(banner)} disponíveis</p>
-                                            </div>
-                                            <button type="button" className="pc-btn pc-btn--sm" onClick={() => setOpenGroup(null)}>Recolher</button>
-                                        </div>
-                                        <div className="pc-subgrid">
-                                            {items.map(item => {
-                                                const inner = (
-                                                    <>
-                                                        {tile(item, 18)}
-                                                        <span className="pc-sub-text">
-                                                            <span className="pc-sub-title">{item.label}</span>
-                                                            {item.desc && <span className="pc-sub-desc">{item.desc}</span>}
-                                                        </span>
-                                                        <span className="pc-sub-tag">{item.tag}</span>
-                                                    </>
-                                                );
-                                                return item.href ? (
-                                                    <a key={item.id} href={item.href} target="_blank" rel="noopener noreferrer" className="pc-sub" onClick={() => track(item.label)}>
-                                                        {inner}
-                                                    </a>
-                                                ) : (
-                                                    <button key={item.id} type="button" className="pc-sub" onClick={() => { track(item.label); item.onSelect(); }}>
-                                                        {inner}
-                                                    </button>
-                                                );
-                                            })}
-                                        </div>
-                                    </div>
-                                );
-                            };
-
-                            const secoes = [...HOME_SECTIONS, { id: 'outros', title: 'Outros serviços', keys: null }]
+                            const baseSecoes = menu === 'home'
+                                ? [...HOME_SECTIONS, { id: 'outros', title: 'Outros serviços', keys: null }]
+                                : [{ id: 'internos', title: 'Serviços internos', keys: null }];
+                            const secoes = baseSecoes
                                 .map(sec => ({
                                     ...sec,
                                     banners: homeBanners.filter(b => sec.keys
@@ -4642,170 +4647,48 @@ function App() {
                                         : !HOME_SECTIONS.some(x => x.keys.includes(b.key)))
                                 }))
                                 .filter(sec => sec.banners.length > 0);
+                            const grupoAberto = openGroup && homeBanners.find(b => b.key === openGroup);
 
                             return (
-                                <div className="flex flex-col gap-8 animate-fadeInUp">
+                                <div key={menu} className="flex flex-col gap-8 animate-fadeInUp">
                                     {secoes.map(sec => {
-                                        const aberto = sec.banners.find(b => b.key === openGroup);
                                         return (
-                                            <section key={sec.id} className="pc-section" aria-labelledby={`secao-${sec.id}`}>
+                                            <section
+                                                key={sec.id}
+                                                className={`pc-section ${isDraggingBanners && dragSection.current && dragSection.current !== sec.id ? 'is-drag-off' : ''}`}
+                                                aria-labelledby={`secao-${sec.id}`}
+                                            >
                                                 <div className="pc-section-head">
                                                     <h2 id={`secao-${sec.id}`} className="pc-section-title">{sec.title}</h2>
                                                     <span className="pc-section-count">{sec.banners.length} {sec.banners.length === 1 ? 'módulo' : 'módulos'}</span>
                                                 </div>
                                                 <div className="pc-grid">
-                                                    {sec.banners.map((banner, i) => renderCard(banner, i))}
-                                                    {aberto && renderPanel(aberto)}
+                                                    {sec.banners.map((banner, i) => renderCard(banner, i, sec.id))}
                                                 </div>
                                             </section>
                                         );
                                     })}
+                                    {grupoAberto && (() => {
+                                        const s = BANNER_STATIC[grupoAberto.key];
+                                        const items = subItemsFor(grupoAberto, s);
+                                        return (
+                                            <PcGroupSheet
+                                                key={grupoAberto.key}
+                                                groupKey={grupoAberto.key}
+                                                title={s.label || grupoAberto.label}
+                                                subtitle={`${items.length} ${unidade(grupoAberto)} · ${s.description}`}
+                                                accent={mosaicAccent(s.accent, darkMode)}
+                                                icon={s}
+                                                items={items}
+                                                renderTile={tile}
+                                                onTrack={track}
+                                                onClose={() => setOpenGroup(null)}
+                                            />
+                                        );
+                                    })()}
                                 </div>
                             );
                         })()}
-
-                        {(currentView === 'outros' || currentView === 'other-services') && (
-                            <div className="animate-fadeInUp space-y-8">
-                                <section>
-                                    <div className="text-center relative py-4 flex flex-col items-center mb-8">
-                                        <div className={`absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 w-24 h-24 blur-3xl rounded-full opacity-25 ${darkMode ? 'bg-blue-500' : 'bg-blue-400'}`}></div>
-
-                                        {/* Logo Branding Outros Serviços */}
-                                        <div className="relative mb-4 animate-fadeInDown">
-                                            <img
-                                                src="image/ecossistema3.png"
-                                                alt="EcoSistema Logo"
-                                                className="h-14 md:h-16 w-auto object-contain drop-shadow-xl"
-                                            />
-                                        </div>
-
-                                        <h2 className={`relative text-[10px] md:text-xs font-black tracking-[0.4em] uppercase mb-1 ${darkMode ? 'text-blue-400' : 'text-blue-600'}`}>
-                                            Central de Serviços Internos
-                                        </h2>
-                                        <div className={`mt-4 mx-auto w-12 h-1 rounded-full ${darkMode ? 'bg-gray-700' : 'bg-gray-200'}`}></div>
-                                    </div>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                        {bannerConfig
-                                            .filter(b => (BANNER_STATIC[b.key]?.menu || 'home') === 'outros')
-                                            .filter(b => currentUser?.role === 'admin' || b.enabled)
-                                            .map((banner, index) => {
-                                                const s = BANNER_STATIC[banner.key];
-                                                if (!s) return null;
-                                                const isAdmin = currentUser?.role === 'admin';
-                                                const isDisabledForUser = !banner.enabled && !isAdmin;
-                                                const isFrozen = banner.isFrozen === true;
-                                                const isEffectivelyFrozen = isFrozen && !isAdmin;
-
-                                                const cardClass = `flex flex-col items-center justify-center p-6 rounded-2xl border-2 transition-all transform hover:-translate-y-2 hover:shadow-2xl ${darkMode
-                                                    ? `bg-gradient-to-br ${s.dark}`
-                                                    : `bg-gradient-to-br ${s.light}`
-                                                    } group relative overflow-hidden ${isDisabledForUser ? 'opacity-40 cursor-default hover:translate-y-0 hover:shadow-none' : ''
-                                                    } ${(s.comingSoon || isEffectivelyFrozen) ? 'cursor-default hover:translate-y-0 hover:shadow-none opactity-75' : ''
-                                                    }`;
-
-                                                const content = (
-                                                    <div
-                                                        style={{
-                                                            transform: 'rotateX(2deg) rotateY(-1deg) translateZ(0)',
-                                                            transformStyle: 'preserve-3d',
-                                                            transition: 'all 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
-                                                            width: '100%',
-                                                            height: '100%',
-                                                            display: 'flex',
-                                                            flexDirection: 'column',
-                                                            alignItems: 'center',
-                                                            justifyContent: 'center'
-                                                        }}
-                                                        onMouseEnter={(e) => {
-                                                            e.currentTarget.style.transform = 'rotateX(4deg) rotateY(-2deg) translateZ(40px)';
-                                                        }}
-                                                        onMouseLeave={(e) => {
-                                                            e.currentTarget.style.transform = 'rotateX(2deg) rotateY(-1deg) translateZ(0)';
-                                                        }}
-                                                    >
-                                                        {isAdmin && (
-                                                            <div className="absolute top-3 right-3 z-20 flex items-center gap-2" onClick={e => e.stopPropagation()}>
-                                                                <div className={`text-[9px] font-black uppercase tracking-tighter ${isFrozen ? (banner.freezeReason === 'construction' ? 'text-amber-500' : 'text-red-500 animate-pulse') : (darkMode ? 'text-green-400' : 'text-green-600')}`}>
-                                                                    {isFrozen ? (banner.freezeReason === 'construction' ? 'EM OBRAS' : 'REVISÃO') : 'ATIVO'}
-                                                                </div>
-                                                                <button
-                                                                    onClick={(e) => {
-                                                                        e.preventDefault();
-                                                                        e.stopPropagation();
-                                                                        if (isFrozen) {
-                                                                            handleFreezeToggleGlobal(banner);
-                                                                        } else {
-                                                                            setFreezeModalBanner(banner);
-                                                                        }
-                                                                    }}
-                                                                    className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${isFrozen ? (banner.freezeReason === 'construction' ? 'bg-amber-500' : 'bg-red-500') : (darkMode ? 'bg-gray-700' : 'bg-gray-200')}`}
-                                                                    title={isFrozen ? "Descongelar serviço" : "Congelar serviço"}
-                                                                >
-                                                                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${isFrozen ? 'translate-x-4' : 'translate-x-0'}`} />
-                                                                </button>
-                                                            </div>
-                                                        )}
-                                                        <div className={`absolute inset-0 opacity-0 group-hover:opacity-10 transition-opacity duration-300 ${darkMode ? (s.hoverBg?.dark || 'bg-white') : (s.hoverBg?.light || 'bg-blue-600')}`}></div>
-                                                        <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-4 ${darkMode ? s.iconDark : s.iconLight} shadow-inner pointer-events-none overflow-hidden`}>
-                                                            {s.imageIcon ? (
-                                                                <img src={s.imageIcon} alt="" className={s.imageClass || 'w-full h-full object-cover'} />
-                                                            ) : (
-                                                                <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={s.icon} />
-                                                                </svg>
-                                                            )}
-                                                        </div>
-                                                        <h3 className={`text-xl font-bold mb-2 text-center pointer-events-none ${darkMode ? 'text-white' : 'text-gray-900'}`}>{s.label || banner.label}</h3>
-                                                        <p className={`text-sm text-center leading-relaxed pointer-events-none ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>{s.description}</p>
-                                                        {isFrozen && !isAdmin && (
-                                                            <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-gray-900/10 dark:bg-black/30 backdrop-blur-[2px] rounded-3xl animate-fadeIn">
-                                                                <div className={`px-4 py-2 rounded-xl shadow-lg border backdrop-blur-md flex items-center gap-2 ${banner.freezeReason === 'construction'
-                                                                    ? 'bg-amber-500/90 border-amber-400 text-white'
-                                                                    : 'bg-red-500/90 border-red-400 text-white'
-                                                                    }`}>
-                                                                    {banner.freezeReason === 'construction' ? (
-                                                                        <svg className="w-5 h-5 animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.384-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" /></svg>
-                                                                    ) : (
-                                                                        <svg className="w-5 h-5 animate-spin-slow" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                                                                    )}
-                                                                    <span className="font-bold text-sm tracking-wide">
-                                                                        {banner.freezeReason === 'construction' ? 'EM CONSTRUÇÃO' : 'EM MANUTENÇÃO'}
-                                                                    </span>
-                                                                </div>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                );
-
-                                                return (
-                                                    <a
-                                                        key={banner.id}
-                                                        href={(isDisabledForUser || s.comingSoon || isEffectivelyFrozen) ? undefined : s.href}
-                                                        target={(isDisabledForUser || s.comingSoon || isEffectivelyFrozen) ? undefined : '_blank'}
-                                                        rel="noopener noreferrer"
-                                                        className={cardClass}
-                                                        onClick={(e) => {
-                                                            if (isEffectivelyFrozen) {
-                                                                e.preventDefault();
-                                                                alert('Este acesso está temporariamente indisponível. Em manutenção.');
-                                                            } else if (isDisabledForUser || s.comingSoon) {
-                                                                e.preventDefault();
-                                                            } else {
-                                                                updateStatistics('bannerClick', {
-                                                                    bannerLabel: s.label || banner.label,
-                                                                    user: currentUser ? currentUser.username : 'Visitante'
-                                                                });
-                                                            }
-                                                        }}
-                                                    >
-                                                        {content}
-                                                    </a>
-                                                );
-                                            })}
-                                    </div>
-                                </section>
-                            </div>
-                        )}
 
                         {currentView === 'search' && (
                             <ConsultaIssCnae
@@ -4824,34 +4707,40 @@ function App() {
 
                         {/* View Admin: Gestão de Usuários */}
                         {currentUser?.role === 'admin' && currentView === 'admin-users' && (
-                            <div className={`mb-8 p-6 rounded-xl border-2 ${darkMode ? 'border-red-600 bg-gray-800' : 'border-red-300 bg-red-50'} animate-fadeInUp`}>
-                                <h2 className={`text-2xl font-bold mb-6 ${darkMode ? 'text-red-400' : 'text-red-700'} flex items-center gap-2`}>
-                                    <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
-                                    </svg>
-                                    Gestão de Usuários
-                                </h2>
+                            <div className="pc-page animate-fadeInUp">
+                                <header className="pc-page-head">
+                                    <div>
+                                        <h1 className="pc-page-title">Usuários</h1>
+                                        <p className="pc-page-lead">Aprove solicitações de acesso, redefina senhas e bloqueie ou exclua contas.</p>
+                                    </div>
+                                </header>
+
                                 {pendingUsers.length > 0 && (
-                                    <div className={`mb-6 p-4 rounded-lg border-2 border-yellow-400 ${darkMode ? 'bg-yellow-900/20' : 'bg-yellow-50'}`}>
-                                        <h3 className={`font-bold mb-3 ${darkMode ? 'text-yellow-400' : 'text-yellow-700'}`}>Solicitações pendentes ({pendingUsers.length})</h3>
-                                        <div className="grid gap-3 md:grid-cols-2">
+                                    <section className="pc-box pc-box--warn" aria-labelledby="usuarios-pendentes">
+                                        <div className="pc-box-head">
+                                            <div>
+                                                <h2 id="usuarios-pendentes" className="pc-box-title">Solicitações pendentes</h2>
+                                                <p className="pc-box-sub">
+                                                    {pendingUsers.length === 1 ? '1 pessoa aguarda' : `${pendingUsers.length} pessoas aguardam`} aprovação para acessar o Ecossistema.
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <ul className="pc-rows">
                                             {pendingUsers.map(user => (
-                                                <div key={user.id} className={`p-3 rounded-lg flex justify-between items-center ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
-                                                    <div>
-                                                        <p className={`font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>{user.name}</p>
-                                                        <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{user.username}</p>
+                                                <li key={user.id} className="pc-row">
+                                                    <span className="pc-avatar pc-avatar--warn">{(user.name || user.username || '?').charAt(0).toUpperCase()}</span>
+                                                    <div className="pc-row-main">
+                                                        <span className="pc-row-name">{user.name}</span>
+                                                        <span className="pc-row-sub pc-mono">@{user.username}</span>
                                                     </div>
-                                                    <div className="flex gap-2">
-                                                        <button
-                                                            onClick={() => handleAuthorizeUser(user.id)}
-                                                            className="px-3 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg text-sm font-medium flex items-center gap-1.5 transition-colors"
-                                                        >
-                                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                                            </svg>
+                                                    <div className="pc-row-actions">
+                                                        <button type="button" className="pc-btn pc-btn--sm pc-btn--primary" onClick={() => handleAuthorizeUser(user.id)}>
+                                                            <PcIcon name="check" size={15} />
                                                             Autorizar
                                                         </button>
                                                         <button
+                                                            type="button"
+                                                            className="pc-btn pc-btn--sm pc-btn--danger"
                                                             onClick={async () => {
                                                                 if (confirm(`Rejeitar e excluir o cadastro de "${user.name}" (${user.username})?`)) {
                                                                     try {
@@ -4863,29 +4752,24 @@ function App() {
                                                                     }
                                                                 }
                                                             }}
-                                                            className="px-3 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg text-sm font-medium flex items-center gap-1.5 transition-colors"
                                                         >
-                                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                                            </svg>
+                                                            <PcIcon name="close" size={15} />
                                                             Rejeitar
                                                         </button>
                                                     </div>
-                                                </div>
+                                                </li>
                                             ))}
-                                        </div>
-                                    </div>
+                                        </ul>
+                                    </section>
                                 )}
-                                <div className={`rounded-lg border ${darkMode ? 'border-gray-700' : 'border-gray-200'} overflow-hidden`}>
-                                    <AdminUsersTable
-                                        darkMode={darkMode}
-                                        adminUsersListKey={adminUsersListKey}
-                                        onRefreshNeeded={() => {
-                                            loadPendingUsers();
-                                            setAdminUsersListKey(k => k + 1);
-                                        }}
-                                    />
-                                </div>
+
+                                <AdminUsersTable
+                                    adminUsersListKey={adminUsersListKey}
+                                    onRefreshNeeded={() => {
+                                        loadPendingUsers();
+                                        setAdminUsersListKey(k => k + 1);
+                                    }}
+                                />
                             </div>
                         )}
 
@@ -4893,36 +4777,6 @@ function App() {
                         {currentUser?.role === 'admin' && currentView === 'admin-banners' && (
                             <AdminBannersPanel darkMode={darkMode} />
                         )}
-
-                        {/* View Admin: Ferramentas (Tools) */}
-                        {currentUser?.role === 'admin' && currentView === 'admin-tools' && (
-                            <div className={`mb-8 p-6 rounded-xl border-2 ${darkMode ? 'border-indigo-600 bg-gray-800' : 'border-indigo-300 bg-indigo-50'} animate-fadeInUp`}>
-                                <h2 className={`text-2xl font-bold mb-6 ${darkMode ? 'text-indigo-400' : 'text-indigo-700'} flex items-center gap-2`}>
-                                    <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.121 14.121L19 19m-7-7l7-7m-7 7l-2.879 2.879M12 12L9.121 9.121m0 5.758a3 3 0 10-4.243-4.243 3 3 0 004.243 4.243z" />
-                                    </svg>
-                                    Tools
-                                </h2>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                                    <a
-                                        href="https://docflow-converter.up.railway.app"
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className={`flex flex-col items-center justify-center p-6 rounded-2xl border-2 transition-all transform hover:-translate-y-2 hover:shadow-2xl ${darkMode ? 'bg-gradient-to-br from-indigo-900/50 to-blue-900/50 border-indigo-500/30 hover:border-indigo-500' : 'bg-gradient-to-br from-indigo-50 to-blue-50 border-indigo-400 hover:border-indigo-500'} group relative overflow-hidden`}
-                                    >
-                                        <div className={`absolute inset-0 opacity-0 group-hover:opacity-10 transition-opacity duration-300 ${darkMode ? 'bg-white' : 'bg-indigo-600'}`}></div>
-                                        <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-4 ${darkMode ? 'bg-indigo-500/20 text-indigo-400' : 'bg-white text-indigo-600 shadow-md'} shadow-inner pointer-events-none overflow-hidden`}>
-                                            <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                            </svg>
-                                        </div>
-                                        <h3 className={`text-xl font-bold mb-2 text-center pointer-events-none ${darkMode ? 'text-white' : 'text-gray-900'}`}>DocFlow</h3>
-                                        <p className={`text-sm text-center leading-relaxed pointer-events-none ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>Conversor Inteligente de Documentos</p>
-                                    </a>
-                                </div>
-                            </div>
-                        )}
-
 
                         {/* Painel de Auditoria */}
                         {currentUser?.role === 'admin' && currentView === 'admin-dashboard' && (() => {
