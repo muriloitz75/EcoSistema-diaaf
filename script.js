@@ -1,4 +1,4 @@
-const { useState, useEffect, useRef } = React;
+const { useState, useEffect, useRef, useMemo } = React;
 
 // Error Boundary para exibir erros de renderização
 class ErrorBoundary extends React.Component {
@@ -769,6 +769,7 @@ function LoginForm({ onLogin, darkMode, wakeProgress, setWakeProgress }) {
 
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
     const [showFirstLoginModal, setShowFirstLoginModal] = useState(false);
     const [firstLoginUser, setFirstLoginUser] = useState(null);
 
@@ -928,226 +929,276 @@ function LoginForm({ onLogin, darkMode, wakeProgress, setWakeProgress }) {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center p-4 transition-all duration-700 animate-fadeIn relative overflow-hidden"
-            style={{
-                backgroundImage: "url('image/fundo.jpg')",
-                backgroundSize: 'cover',
-                backgroundPosition: 'center',
-                backgroundRepeat: 'no-repeat',
-                perspective: '1200px'
-            }}>
-            {/* Overlay sutil para garantir legibilidade e profundidade */}
-            <div className={`absolute inset-0 ${darkMode ? 'bg-black/40' : 'bg-blue-900/15'} backdrop-blur-[4px]`}></div>
-            <div
-                className={`relative max-w-md w-full p-8 card-modern glass ${darkMode ? 'dark border-blue-500/30 bg-gray-900/40 shadow-[0_50px_100px_-20px_rgba(0,0,0,0.6),0_30px_60px_-30px_rgba(0,0,0,0.7),inset_0_1px_1px_rgba(255,255,255,0.1)]' : 'bg-white/75 border-white/60 shadow-[0_40px_80px_-15px_rgba(0,0,0,0.3),inset_0_1px_1px_rgba(255,255,255,0.5)]'} animate-fadeInUp backdrop-blur-2xl rounded-[2.5rem]`}
-                style={{
-                    transform: 'rotateX(3deg) rotateY(-2deg) translateZ(30px)',
-                    transformStyle: 'preserve-3d'
-                }}
-            >
-                <div className="text-center mb-6">
-                    <div className="relative inline-block mb-4 group transition-all duration-500 hover:scale-110">
-                        {/* Glow de Fundo para efeito 'Pleno' */}
-                        <div className={`absolute inset-0 blur-2xl rounded-full opacity-30 animate-pulse ${darkMode ? 'bg-blue-500' : 'bg-blue-400'}`}></div>
-                        <img
-                            src="image/ecossistema3.png"
-                            alt="Logo Ecossistema DIAAF"
-                            className="relative h-14 w-auto object-contain drop-shadow-2xl"
-                        />
+        <div className="pc-login animate-fadeIn">
+            <section className="pc-login-brand" aria-label="Sobre o Ecossistema DIAAF">
+                <svg className="pc-login-net" aria-hidden="true" width="420" height="420" viewBox="0 0 420 420" fill="none">
+                    <g stroke="#24324C" strokeWidth="1.5">
+                        <line x1="210" y1="210" x2="80" y2="90" /><line x1="210" y1="210" x2="340" y2="90" />
+                        <line x1="210" y1="210" x2="60" y2="230" /><line x1="210" y1="210" x2="360" y2="230" />
+                        <line x1="210" y1="210" x2="110" y2="350" /><line x1="210" y1="210" x2="320" y2="350" />
+                        <line x1="80" y1="90" x2="340" y2="90" /><line x1="60" y1="230" x2="110" y2="350" /><line x1="360" y1="230" x2="320" y2="350" />
+                    </g>
+                    <g fill="#0D1524" stroke="#2E4A7A" strokeWidth="1.5">
+                        <circle cx="210" cy="210" r="34" /><circle cx="80" cy="90" r="18" /><circle cx="340" cy="90" r="18" />
+                        <circle cx="60" cy="230" r="18" /><circle cx="360" cy="230" r="18" /><circle cx="110" cy="350" r="18" /><circle cx="320" cy="350" r="18" />
+                    </g>
+                </svg>
+
+                <div className="relative flex items-center gap-3">
+                    <div className="pc-login-mark">
+                        <img src="image/ecossistema3.png" alt="" />
                     </div>
-                    <h2
-                        className={`text-xl font-black tracking-tighter ${darkMode ? 'text-white' : 'text-gray-900'} uppercase`}
-                        style={{ fontFamily: "'Montserrat', sans-serif", letterSpacing: '-0.02em' }}
-                    >
-                        {isForgotPassword ? 'Recuperar Senha' : (isRegistering ? 'Criar Nova Conta' : 'Ecossistema DIAAF')}
-                    </h2>
-                    <p className={`mt-3 text-sm font-medium ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                        {isForgotPassword ? 'Informe seu usuário para solicitar o desbloqueio' : (isRegistering ? 'Preencha os dados abaixo para se cadastrar' : 'Faça login para acessar o sistema')}
-                    </p>
+                    <div className="flex flex-col">
+                        <span className="pc-display" style={{ fontWeight: 700, fontSize: '1.125rem' }}>Ecossistema DIAAF</span>
+                        <span style={{ fontSize: '.8125rem', color: '#A9B4C6' }}>Divisão de Informações e Arrecadação</span>
+                    </div>
                 </div>
 
-                {isForgotPassword ? (
-                    <form className="space-y-6 animate-fadeIn" onSubmit={handleForgotPasswordSubmit}>
-                        <div className="space-y-2">
-                            <label htmlFor="forgot-username" className={`block text-sm font-bold ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>Nome de Usuário</label>
-                            <input
-                                id="forgot-username"
-                                name="username"
-                                type="text"
-                                required
-                                autoComplete="username"
-                                className={`input-modern w-full ${darkMode ? 'dark' : ''}`}
-                                placeholder="Seu nome de usuário cadastrado&hellip;"
-                                value={username}
-                                onChange={(e) => setUsername(e.target.value)}
-                            />
-                        </div>
+                <div className="relative flex flex-col gap-7" style={{ maxWidth: '32.5rem' }}>
+                    <h1 className="pc-login-title">Os serviços fiscais da DIAAF, em um só lugar.</h1>
+                    <p className="pc-login-lead">Consulte alíquotas de ISS, gere pareceres, acompanhe processos e acesse os portais do município com uma única conta.</p>
+                    <ul className="pc-login-feat">
+                        <li>
+                            <span className="pc-login-feat-ico" style={{ background: '#16233A', color: '#7EA2FF' }}>
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
+                            </span>
+                            <span><strong>Consulta ISS / CNAE</strong><span>Itens da LC 001/2003 cruzados com os códigos CNAE</span></span>
+                        </li>
+                        <li>
+                            <span className="pc-login-feat-ico" style={{ background: '#12302E', color: '#4FD1BF' }}>
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" /><path d="M14 3v5h5" /><path d="M9 13h6M9 17h4" /></svg>
+                            </span>
+                            <span><strong>Pareceres e processos</strong><span>Geração de pareceres e painel de distribuição de processos</span></span>
+                        </li>
+                        <li>
+                            <span className="pc-login-feat-ico" style={{ background: '#2A2414', color: '#F2B65A' }}>
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 3 4 6v6c0 4.5 3.4 8.3 8 9 4.6-.7 8-4.5 8-9V6z" /><path d="m9 12 2 2 4-4" /></svg>
+                            </span>
+                            <span><strong>Acesso protegido</strong><span>Cadastros aprovados pela administração e bloqueio por inatividade</span></span>
+                        </li>
+                    </ul>
+                </div>
 
-                        {forgotPasswordMsg.text && (
-                            <div className={`text-sm text-center p-4 rounded-xl border animate-fadeIn ${forgotPasswordMsg.type === 'success' ? (darkMode ? 'bg-green-900/30 border-green-700 text-green-300' : 'bg-green-50 border-green-200 text-green-700') : (darkMode ? 'bg-red-900/30 border-red-700 text-red-300' : 'bg-red-50 border-red-200 text-red-700')}`}>
-                                <div className="flex items-center justify-center gap-2">
-                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={forgotPasswordMsg.type === 'success' ? "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" : "M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"} /></svg>
-                                    <span className="font-semibold">{forgotPasswordMsg.text}</span>
+                <p className="relative" style={{ margin: 0, fontSize: '.8125rem', color: '#8A96AA' }}>Prefeitura Municipal de Imperatriz — MA</p>
+            </section>
+
+            <main className="pc-login-main">
+                <div className="pc-login-form">
+                    <div>
+                        <h2 className="pc-login-h2">
+                            {isForgotPassword ? 'Recuperar senha' : (isRegistering ? 'Criar conta' : 'Entrar')}
+                        </h2>
+                        <p className="pc-login-sub">
+                            {isForgotPassword ? 'Informe seu usuário para solicitar a redefinição.' : (isRegistering ? 'Preencha os dados para solicitar acesso.' : 'Use suas credenciais de servidor.')}
+                        </p>
+                    </div>
+
+                    {wakeProgress > 0 && (
+                        <div className="pc-wake" role="status">
+                            <div className="pc-wake-row">
+                                <span><span className="pc-wake-dot" aria-hidden="true"></span>Preparando o servidor</span>
+                                <span className="pc-mono" style={{ color: 'var(--pc-teal)' }}>{wakeProgress}%</span>
+                            </div>
+                            <div className="pc-wake-track" aria-hidden="true">
+                                <div className="pc-wake-fill" style={{ width: `${wakeProgress}%` }}></div>
+                            </div>
+                        </div>
+                    )}
+
+                    {isForgotPassword ? (
+                        <form className="flex flex-col gap-6" onSubmit={handleForgotPasswordSubmit}>
+                            <div className="pc-field">
+                                <label htmlFor="forgot-username" className="pc-label">Usuário</label>
+                                <div className="pc-input">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></svg>
+                                    <input
+                                        id="forgot-username"
+                                        name="username"
+                                        type="text"
+                                        required
+                                        autoComplete="username"
+                                        placeholder="Seu usuário cadastrado"
+                                        value={username}
+                                        onChange={(e) => setUsername(e.target.value)}
+                                    />
                                 </div>
                             </div>
-                        )}
 
-                        <button
-                            type="submit"
-                            disabled={isLoading}
-                            className="btn-modern gradient-primary w-full py-3 text-white shadow-blue-500/25 disabled:opacity-50"
-                        >
-                            {isLoading ? 'Enviando Solicitação&hellip;' : 'Solicitar Redefinição'}
-                        </button>
+                            {forgotPasswordMsg.text && (
+                                <div className={`pc-alert ${forgotPasswordMsg.type === 'success' ? 'pc-alert--ok' : 'pc-alert--error'}`} role="alert">
+                                    <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={forgotPasswordMsg.type === 'success' ? "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" : "M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"} /></svg>
+                                    <span>{forgotPasswordMsg.text}</span>
+                                </div>
+                            )}
 
-                        <div className="text-center pt-4 border-t border-gray-100 dark:border-gray-700/50">
-                            <button
-                                type="button"
-                                onClick={toggleForgotPassword}
-                                className={`text-sm font-bold transition-all hover:opacity-80 scale-100 hover:scale-105 active:scale-95 ${darkMode ? 'text-blue-400' : 'text-blue-600'}`}
-                            >
-                                Voltar para o Login Seguro
+                            <button type="submit" disabled={isLoading} className="pc-btn pc-btn--primary" style={{ minHeight: '3.125rem', fontSize: '1rem' }}>
+                                {isLoading ? 'Enviando solicitação…' : 'Solicitar redefinição'}
                             </button>
-                        </div>
-                    </form>
-                ) : (
-                    <form className="space-y-5 animate-fadeIn" onSubmit={handleSubmit}>
-                        <div className="space-y-4">
+
+                            <div style={{ height: 1, background: 'var(--pc-line)' }}></div>
+                            <p style={{ margin: 0, fontSize: '.875rem', color: 'var(--pc-ink-2)' }}>
+                                Lembrou a senha? <button type="button" onClick={toggleForgotPassword} className="pc-link">Voltar para o login</button>
+                            </p>
+                        </form>
+                    ) : (
+                        <form className="flex flex-col gap-6" onSubmit={handleSubmit}>
                             {isRegistering && (
                                 <>
-                                    <div className="space-y-2">
-                                        <label htmlFor="reg-name" className={`block text-sm font-bold ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>Nome Completo</label>
-                                        <input
-                                            id="reg-name"
-                                            name="name"
-                                            type="text"
-                                            required
-                                            autoComplete="name"
-                                            className={`input-modern w-full ${darkMode ? 'dark' : ''}`}
-                                            placeholder="Seu nome completo&hellip;"
-                                            value={name}
-                                            onChange={(e) => setName(e.target.value)}
-                                        />
+                                    <div className="pc-field">
+                                        <label htmlFor="reg-name" className="pc-label">Nome completo</label>
+                                        <div className="pc-input">
+                                            <input
+                                                id="reg-name"
+                                                name="name"
+                                                type="text"
+                                                required
+                                                autoComplete="name"
+                                                placeholder="Seu nome completo"
+                                                value={name}
+                                                onChange={(e) => setName(e.target.value)}
+                                            />
+                                        </div>
                                     </div>
-                                    <div className="space-y-2">
-                                        <label htmlFor="reg-email" className={`block text-sm font-bold ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>Email</label>
-                                        <input
-                                            id="reg-email"
-                                            name="email"
-                                            type="email"
-                                            required
-                                            autoComplete="email"
-                                            className={`input-modern w-full ${darkMode ? 'dark' : ''}`}
-                                            placeholder="seu@email.com&hellip;"
-                                            value={email}
-                                            onChange={(e) => setEmail(e.target.value)}
-                                        />
+                                    <div className="pc-field">
+                                        <label htmlFor="reg-email" className="pc-label">E-mail</label>
+                                        <div className="pc-input">
+                                            <input
+                                                id="reg-email"
+                                                name="email"
+                                                type="email"
+                                                required
+                                                autoComplete="email"
+                                                placeholder="seu@email.com"
+                                                value={email}
+                                                onChange={(e) => setEmail(e.target.value)}
+                                            />
+                                        </div>
                                     </div>
                                 </>
                             )}
 
-                            <div className="space-y-2">
-                                <label htmlFor="login-username" className={`block text-sm font-bold ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>Usuário</label>
-                                <input
-                                    id="login-username"
-                                    name="username"
-                                    type="text"
-                                    required
-                                    autoComplete="username"
-                                    className={`input-modern w-full ${darkMode ? 'dark' : ''}`}
-                                    placeholder="Nome de usuário&hellip;"
-                                    value={username}
-                                    onChange={(e) => setUsername(e.target.value)}
-                                />
+                            <div className="pc-field">
+                                <label htmlFor="login-username" className="pc-label">Usuário</label>
+                                <div className="pc-input">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></svg>
+                                    <input
+                                        id="login-username"
+                                        name="username"
+                                        type="text"
+                                        required
+                                        autoComplete="username"
+                                        placeholder="nome.sobrenome"
+                                        value={username}
+                                        onChange={(e) => setUsername(e.target.value)}
+                                    />
+                                </div>
                             </div>
 
-                            <div className="space-y-2">
-                                <label htmlFor="login-password" className={`block text-sm font-bold ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>Senha</label>
-                                <input
-                                    id="login-password"
-                                    name="password"
-                                    type="password"
-                                    required
-                                    autoComplete={isRegistering ? "new-password" : "current-password"}
-                                    className={`input-modern w-full ${darkMode ? 'dark' : ''}`}
-                                    placeholder="Sua senha secreta&hellip;"
-                                    value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
-                                />
+                            <div className="pc-field">
+                                <div className="flex items-baseline justify-between gap-3">
+                                    <label htmlFor="login-password" className="pc-label">Senha</label>
+                                    {!isRegistering && (
+                                        <button id="forgot-password-link" type="button" onClick={toggleForgotPassword} className="pc-link" style={{ fontSize: '.875rem', fontWeight: 500 }}>
+                                            Esqueci minha senha
+                                        </button>
+                                    )}
+                                </div>
+                                <div className="pc-input" style={{ paddingRight: '.375rem' }}>
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg>
+                                    <input
+                                        id="login-password"
+                                        name="password"
+                                        type={showPassword ? 'text' : 'password'}
+                                        required
+                                        autoComplete={isRegistering ? "new-password" : "current-password"}
+                                        placeholder="Sua senha"
+                                        value={password}
+                                        onChange={(e) => setPassword(e.target.value)}
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowPassword(v => !v)}
+                                        className="pc-iconbtn"
+                                        style={{ width: '2.25rem', height: '2.25rem', border: 0, background: 'transparent' }}
+                                        aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                                        aria-pressed={showPassword}
+                                    >
+                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                            {showPassword
+                                                ? <path d="M3 3l18 18M10.6 10.6a2 2 0 0 0 2.8 2.8M9.9 5.1A9.8 9.8 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-3.2 4.1M6.6 6.6C3.9 8.4 2 12 2 12s3.5 7 10 7a9.6 9.6 0 0 0 5.4-1.6" />
+                                                : <><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" /><circle cx="12" cy="12" r="3" /></>}
+                                        </svg>
+                                    </button>
+                                </div>
                             </div>
 
                             {isRegistering && (
-                                <div className="space-y-2">
-                                    <label htmlFor="reg-confirm" className={`block text-sm font-bold ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>Confirmar Senha</label>
-                                    <input
-                                        id="reg-confirm"
-                                        name="confirmPassword"
-                                        type="password"
-                                        required
-                                        autoComplete="new-password"
-                                        className={`input-modern w-full ${darkMode ? 'dark' : ''}`}
-                                        placeholder="Repita a nova senha&hellip;"
-                                        value={confirmPassword}
-                                        onChange={(e) => setConfirmPassword(e.target.value)}
-                                    />
+                                <div className="pc-field">
+                                    <label htmlFor="reg-confirm" className="pc-label">Confirmar senha</label>
+                                    <div className="pc-input">
+                                        <input
+                                            id="reg-confirm"
+                                            name="confirmPassword"
+                                            type={showPassword ? 'text' : 'password'}
+                                            required
+                                            autoComplete="new-password"
+                                            placeholder="Repita a senha"
+                                            value={confirmPassword}
+                                            onChange={(e) => setConfirmPassword(e.target.value)}
+                                        />
+                                    </div>
                                 </div>
                             )}
-                        </div>
 
-                        {error && (
-                            <div className={`p-4 rounded-xl border animate-pulse ${error.includes('bloqueada') || error.includes('Restam') ? (darkMode ? 'bg-amber-900/30 border-amber-700 text-amber-300' : 'bg-amber-50 border-amber-200 text-amber-800') : (darkMode ? 'bg-red-900/30 border-red-700 text-red-300' : 'bg-red-50 border-red-200 text-red-800')}`}>
-                                <p className="text-sm font-semibold text-center">{error}</p>
-                            </div>
-                        )}
-
-                        <button
-                            type="submit"
-                            disabled={isLoading || (wakeProgress > 0 && wakeProgress < 100)}
-                            className={`btn-modern w-full py-3.5 text-white text-base shadow-lg transition-all active:scale-95 disabled:opacity-50 relative overflow-hidden ${isRegistering ? 'bg-gradient-to-r from-emerald-500 to-teal-600 shadow-emerald-500/25' : 'gradient-primary shadow-blue-500/25'}`}
-                        >
-                            {/* Barra de progresso discreta dentro do botão */}
-                            {wakeProgress > 0 && (
-                                <div
-                                    className="absolute bottom-0 left-0 h-1 bg-white/40 transition-all duration-500"
-                                    style={{ width: `${wakeProgress}%` }}
-                                ></div>
+                            {error && (
+                                <div className={`pc-alert ${error.includes('bloqueada') || error.includes('Restam') ? 'pc-alert--warn' : 'pc-alert--error'}`} role="alert">
+                                    <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                    <span>{error}</span>
+                                </div>
                             )}
 
-                            {wakeProgress > 0 ? (
-                                <div className="flex items-center justify-center gap-2">
-                                    <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
-                                    <span className="text-sm font-bold uppercase tracking-wider">Despertando {wakeProgress}%</span>
-                                </div>
-                            ) : isLoading ? (
-                                <div className="flex items-center justify-center gap-2">
-                                    <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
-                                    <span>Processando&hellip;</span>
-                                </div>
-                            ) : (isRegistering ? 'Criar Minha Conta' : 'Acessar Sistema')}
-                        </button>
-
-                        <div className="flex flex-col gap-4 text-center pt-6 border-t border-gray-100 dark:border-gray-700/50">
-                            {!isRegistering && (
-                                <button
-                                    id="forgot-password-link"
-                                    type="button"
-                                    onClick={toggleForgotPassword}
-                                    className={`font-medium transition-colors hover:underline ${darkMode ? 'text-indigo-400 hover:text-indigo-300' : 'text-indigo-600 hover:text-indigo-700'}`}
-                                >
-                                    Esqueceu sua senha?
-                                </button>
-                            )}
                             <button
-                                type="button"
-                                onClick={toggleMode}
-                                className={`font-medium transition-colors hover:underline ${isRegistering ? 'w-full text-center' : ''} ${darkMode ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-gray-900'}`}
+                                type="submit"
+                                disabled={isLoading || (wakeProgress > 0 && wakeProgress < 100)}
+                                className="pc-btn pc-btn--primary"
+                                style={{ minHeight: '3.125rem', fontSize: '1rem' }}
                             >
-                                {isRegistering ? 'Voltar para o Login' : 'Criar nova conta'}
+                                {wakeProgress > 0 ? (
+                                    <>
+                                        <span className="w-4 h-4 border-2 border-current rounded-full animate-spin" style={{ borderTopColor: 'transparent' }} aria-hidden="true"></span>
+                                        Conectando…
+                                    </>
+                                ) : isLoading ? (
+                                    <>
+                                        <span className="w-4 h-4 border-2 border-current rounded-full animate-spin" style={{ borderTopColor: 'transparent' }} aria-hidden="true"></span>
+                                        Processando…
+                                    </>
+                                ) : (
+                                    <>
+                                        {isRegistering ? 'Solicitar cadastro' : 'Entrar'}
+                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+                                    </>
+                                )}
                             </button>
-                        </div>
-                    </form>
-                )}
-            </div>
+
+                            <div style={{ height: 1, background: 'var(--pc-line)' }}></div>
+
+                            <div className="flex flex-col gap-1.5" style={{ fontSize: '.875rem' }}>
+                                {isRegistering ? (
+                                    <p style={{ margin: 0, color: 'var(--pc-ink-2)' }}>
+                                        Já tem acesso? <button type="button" onClick={toggleMode} className="pc-link">Voltar para o login</button>
+                                    </p>
+                                ) : (
+                                    <p style={{ margin: 0, color: 'var(--pc-ink-2)' }}>
+                                        Ainda não tem acesso? <button type="button" onClick={toggleMode} className="pc-link">Solicitar cadastro</button>
+                                    </p>
+                                )}
+                                <p style={{ margin: 0, color: 'var(--pc-muted)', lineHeight: 1.5 }}>Novos cadastros ficam pendentes até a aprovação de um administrador.</p>
+                            </div>
+                        </form>
+                    )}
+                </div>
+            </main>
 
             {/* Modal de Primeiro Acesso */}
             {showFirstLoginModal && firstLoginUser && (
@@ -1876,289 +1927,130 @@ function AdminUsersTable({ darkMode, adminUsersListKey, onRefreshNeeded }) {
 }
 
 // Componente Sidebar Completo com Menu Lateral
-function Sidebar({ darkMode, currentView, setCurrentView, currentUser, onLogout, sidebarMobileOpen, onCloseSidebar }) {
-    const [isExpanded, setIsExpanded] = useState(false);
+// Ícones de traço (24×24) usados na navegação e no cabeçalho.
+const PC_ICONS = {
+    home: <path d="M4 5a1 1 0 0 1 1-1h5v7H4zM14 4h5a1 1 0 0 1 1 1v4h-6zM14 13h6v6a1 1 0 0 1-1 1h-5zM4 15h6v5H5a1 1 0 0 1-1-1z" />,
+    search: <><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></>,
+    briefcase: <><path d="M4 8h16v11a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z" /><path d="M9 8V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3" /></>,
+    user: <><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></>,
+    shield: <><path d="M12 3 4 6v6c0 4.5 3.4 8.3 8 9 4.6-.7 8-4.5 8-9V6z" /><path d="m9 12 2 2 4-4" /></>,
+    users: <><circle cx="9" cy="8" r="3.5" /><path d="M2.5 20a6.5 6.5 0 0 1 13 0" /><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6.5 6.5 0 0 1 3.5 6" /></>,
+    layout: <><rect x="4" y="4" width="16" height="5" rx="1" /><rect x="4" y="13" width="7" height="7" rx="1" /><rect x="15" y="13" width="5" height="7" rx="1" /></>,
+    wrench: <path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.4-.6-.6-2.4z" />,
+    logout: <><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3" /><path d="M10 17l5-5-5-5M15 12H4" /></>,
+    close: <path d="M18 6 6 18M6 6l12 12" />,
+    menu: <path d="M4 6h16M4 12h16M4 18h16" />,
+    moon: <path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" />,
+    sun: <><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" /></>,
+    mail: <><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m3 7 9 6 9-6" /></>,
+    back: <path d="M19 12H5M11 18l-6-6 6-6" />,
+    chevron: <path d="m6 9 6 6 6-6" />,
+    arrowOut: <path d="M7 17 17 7M8 7h9v9" />,
+    download: <path d="M12 4v11M7 10l5 5 5-5M5 20h14" />,
+    history: <><path d="M3 12a9 9 0 1 0 3-6.7L3 8" /><path d="M3 3v5h5M12 7v5l3 2" /></>,
+    copy: <><rect x="8" y="8" width="12" height="12" rx="2" /><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3" /></>,
+    userPlus: <><circle cx="9" cy="8" r="3.5" /><path d="M2.5 20a6.5 6.5 0 0 1 13 0" /><path d="M19 8v6M16 11h6" /></>,
+    grip: <path d="M4 9h16M4 15h16" />,
+    globe: <><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18" /></>
+};
+
+function PcIcon({ name, size = 20, className, strokeWidth = 2 }) {
+    return (
+        <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            {PC_ICONS[name]}
+        </svg>
+    );
+}
+
+function Sidebar({ currentView, setCurrentView, currentUser, onLogout, sidebarMobileOpen, onCloseSidebar, pendingCount = 0 }) {
+    const isAdmin = currentUser?.role === 'admin';
 
     const handleNavigate = (view) => {
-        if (typeof view === 'string' && view.startsWith('http')) {
-            window.open(view, '_blank');
-            return;
-        }
         setCurrentView(view);
         onCloseSidebar?.();
     };
 
     const menuItems = [
-        {
-            id: 'profile',
-            label: 'Meu Perfil',
-            icon: (
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                </svg>
-            ),
-            view: 'profile'
-        },
-        {
-            id: 'other-services',
-            label: 'Serviços Internos',
-            icon: (
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                </svg>
-            ),
-            view: 'other-services'
-        }
+        { id: 'home', label: 'Início', icon: 'home' },
+        { id: 'search', label: 'Consulta ISS / CNAE', icon: 'search' },
+        { id: 'other-services', label: 'Serviços Internos', icon: 'briefcase' },
+        { id: 'profile', label: 'Meu Perfil', icon: 'user' }
     ];
 
-    // Itens administrativos (apenas para admin)
     const adminItems = [
-        {
-            id: 'admin-dashboard',
-            label: 'Auditoria',
-            icon: (
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                </svg>
-            ),
-            view: 'admin-dashboard'
-        },
-        {
-            id: 'admin-users',
-            label: 'Usuários',
-            icon: (
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
-                </svg>
-            ),
-            view: 'admin-users'
-        },
-        {
-            id: 'admin-banners',
-            label: 'Banners',
-            icon: (
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
-                </svg>
-            ),
-            view: 'admin-banners'
-        },
-        {
-            id: 'admin-tools',
-            label: 'Tools',
-            icon: (
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.121 14.121L19 19m-7-7l7-7m-7 7l-2.879 2.879M12 12L9.121 9.121m0 5.758a3 3 0 10-4.243-4.243 3 3 0 004.243 4.243z" />
-                </svg>
-            ),
-            view: 'admin-tools'
-        }
+        { id: 'admin-dashboard', label: 'Auditoria', icon: 'shield' },
+        { id: 'admin-users', label: 'Usuários', icon: 'users', count: pendingCount },
+        { id: 'admin-banners', label: 'Banners', icon: 'layout' },
+        { id: 'admin-tools', label: 'Ferramentas', icon: 'wrench' }
     ];
 
-    const isActive = (id) => {
-        return currentView === id;
+    const renderItem = (item) => {
+        const active = currentView === item.id || (item.id === 'other-services' && currentView === 'outros');
+        return (
+            <button
+                key={item.id}
+                type="button"
+                onClick={() => handleNavigate(item.id)}
+                className={`pc-nav-item ${active ? 'is-active' : ''}`}
+                aria-current={active ? 'page' : undefined}
+            >
+                <PcIcon name={item.icon} />
+                {item.label}
+                {item.count > 0 && (
+                    <span className="pc-nav-count" aria-label={`${item.count} pendente${item.count === 1 ? '' : 's'}`}>{item.count}</span>
+                )}
+            </button>
+        );
     };
-
-    const toneMain = sideTone('main', darkMode);
-    const toneAdmin = sideTone('admin', darkMode);
-
-    const renderItem = (item, tone) => (
-        <button
-            key={item.id}
-            onClick={() => handleNavigate(item.view)}
-            className={`hud-nav-item ${isActive(item.id) ? 'is-active' : ''}`}
-            style={{ '--tone': tone }}
-        >
-            <span className="hud-nav-icon">{item.icon}</span>
-            {isExpanded && <span className="hud-nav-text animate-fadeInLeft">{item.label}</span>}
-            {!isExpanded && <span className="hud-tip">{item.label}</span>}
-        </button>
-    );
 
     return (
-        <div
-            className={`sidebar-container hud hud-side ${darkMode ? 'is-dark' : ''} flex-shrink-0 transition-all duration-300 ease-in-out ${isExpanded ? 'w-64' : 'w-20'} ${sidebarMobileOpen ? 'open' : ''}`}
-            onMouseEnter={() => setIsExpanded(true)}
-            onMouseLeave={() => setIsExpanded(false)}
-        >
-            {/* Logo/Header */}
-            <div className="hud-side-head">
-                <div className="flex items-center gap-3">
-                    <div className="hud-side-mark">
-                        <img src="image/ecossistema3.png" alt="DIAAF Logo" />
-                    </div>
-                    {isExpanded && (
-                        <div className="overflow-hidden animate-fadeInLeft">
-                            <h1 className="hud-side-title">Painel DIAAF</h1>
-                            <p className="hud-side-sub">Auditoria e Assuntos Fiscais</p>
-                        </div>
-                    )}
+        <aside className={`pc-side ${sidebarMobileOpen ? 'is-open' : ''}`} aria-label="Menu lateral">
+            <div className="pc-side-brand">
+                <div className="pc-side-mark">
+                    <img src="image/ecossistema3.png" alt="" />
                 </div>
+                <div className="min-w-0">
+                    <p className="pc-side-title">Painel DIAAF</p>
+                    <p className="pc-side-sub">Ecossistema digital</p>
+                </div>
+                <button type="button" className="pc-iconbtn pc-side-close" onClick={onCloseSidebar} aria-label="Fechar menu">
+                    <PcIcon name="close" size={18} />
+                </button>
             </div>
 
-            {/* Menu de Navegação */}
-            <nav className="hud-nav flex-1 overflow-y-auto custom-scrollbar">
-                {isExpanded && <p className="hud-nav-label">Menu Principal</p>}
-
-                {menuItems.map(item => renderItem(item, toneMain))}
-
-                {/* Seção Administrativa (apenas para admin) */}
-                {currentUser?.role === 'admin' && (
-                    <>
-                        <div className="hud-nav-div"></div>
-                        {isExpanded && (
-                            <p className="hud-nav-label hud-nav-label--admin" style={{ '--tone': toneAdmin }}>
-                                Administração
-                            </p>
-                        )}
-                        {adminItems.map(item => renderItem(item, toneAdmin))}
-                    </>
-                )}
+            <nav className="pc-nav" aria-label="Principal">
+                {menuItems.map(renderItem)}
             </nav>
 
-            {/* Informações do Usuário no Rodapé — mesmo avatar do cabeçalho */}
-            <div className="hud-side-foot">
-                <div className="hud-panel gap-3 p-2">
-                    <div className="hud-avatar">
-                        <img
-                            src={avatarFor(currentUser)}
-                            alt=""
-                            onError={(e) => {
-                                e.target.style.display = 'none';
-                                e.target.nextSibling.style.display = 'flex';
-                            }}
-                        />
-                        <span className="absolute inset-0 items-center justify-center text-white font-bold text-xs tracking-widest" style={{ display: 'none' }}>
-                            {iniciaisDe(currentUser)}
-                        </span>
-                        <span className="hud-status"></span>
-                    </div>
-                    {isExpanded && (
-                        <div className="overflow-hidden flex-1 min-w-0">
-                            <p className="hud-name truncate">{currentUser?.name || 'Usuário'}</p>
-                            <p className="hud-greet truncate">
-                                {currentUser?.role === 'admin' ? 'Administrador' : 'Usuário'}
-                            </p>
-                        </div>
-                    )}
-                    {isExpanded && (
-                        <button
-                            onClick={onLogout}
-                            className="hud-nav-item"
-                            style={{ '--tone': toneAdmin, width: 'auto', padding: '0.45rem' }}
-                            title="Sair"
-                            aria-label="Sair"
-                        >
-                            <span className="hud-nav-icon">
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                                </svg>
-                            </span>
-                        </button>
-                    )}
+            {isAdmin && (
+                <nav className="pc-nav" aria-label="Administração">
+                    <span className="pc-nav-label">Administração</span>
+                    {adminItems.map(renderItem)}
+                </nav>
+            )}
+
+            <div className="pc-side-user">
+                <span className="pc-avatar" aria-hidden="true">{iniciaisDe(currentUser)}</span>
+                <div className="min-w-0 flex-1">
+                    <p className="pc-side-user-name">{currentUser?.name || currentUser?.username || 'Usuário'}</p>
+                    <p className="pc-side-user-role">{isAdmin ? 'Administrador' : 'Usuário'}</p>
                 </div>
+                <button type="button" onClick={onLogout} className="pc-iconbtn" style={{ border: 0, width: '2.5rem', height: '2.5rem' }} aria-label="Sair" title="Sair">
+                    <PcIcon name="logout" size={18} />
+                </button>
             </div>
-        </div>
+        </aside>
     );
-}
-
-// ==================== EMPACOTADOR DO MOSAICO ====================
-// O `grid-auto-flow: dense` do CSS só tapa uma lacuna com um item POSTERIOR que
-// caiba nela. Quando os cards grandes vão para o fim da ordem — o que acontece
-// quando o admin os arrasta para baixo — não sobra ninguém depois para tapar o
-// buraco que eles deixam, e a lacuna persiste.
-//
-// Aqui a grade é simulada com o mesmo algoritmo do navegador (primeiro encaixe
-// a partir do topo, que é o que `dense` faz) e os spans são ajustados até as
-// fileiras fecharem. Alargar é preferido a esticar, porque não altera a altura
-// da fileira; altura 3 é último recurso.
-const MOSAIC_UNITS = {
-    12: { hero: [6, 2], wide: [6, 1], tall: [3, 2], std: [3, 1] },
-    6: { hero: [6, 2], wide: [6, 1], tall: [3, 2], std: [3, 1] },
-    2: { hero: [2, 2], wide: [2, 1], tall: [1, 2], std: [1, 1] }
-};
-
-function mosaicPlace(boxes, cols) {
-    const g = [];
-    const ens = r => { while (g.length <= r) g.push(new Array(cols).fill(-1)); };
-    const fits = (r, c, w, h) => {
-        if (c + w > cols) return false;
-        for (let i = 0; i < h; i++) { ens(r + i); for (let j = 0; j < w; j++) if (g[r + i][c + j] >= 0) return false; }
-        return true;
-    };
-    const put = (x, r, c, w, h) => { for (let i = 0; i < h; i++) { ens(r + i); for (let j = 0; j < w; j++) g[r + i][c + j] = x; } };
-    const pos = [];
-    boxes.forEach(([w, h], x) => {
-        let done = false;
-        for (let r = 0; !done; r++) for (let c = 0; c < cols; c++) if (fits(r, c, w, h)) { put(x, r, c, w, h); pos[x] = { r, c, w, h }; done = true; break; }
-    });
-    return { g, pos };
-}
-
-function mosaicHoles(g) {
-    const out = [];
-    for (let r = 0; r < g.length; r++) {
-        let c = 0;
-        while (c < g[r].length) {
-            if (g[r][c] >= 0) { c++; continue; }
-            let e = c; while (e < g[r].length && g[r][e] < 0) e++;
-            out.push({ r, c, w: e - c });
-            c = e;
-        }
-    }
-    return out;
-}
-
-function mosaicSolve(sizes, cols, capH = 3, maxPass = 8) {
-    const units = MOSAIC_UNITS[cols] || MOSAIC_UNITS[12];
-    const boxes = sizes.map(s => [...(units[s] || units.std)]);
-    if (!boxes.length) return boxes;
-
-    for (let pass = 0; pass < maxPass; pass++) {
-        const { g, pos } = mosaicPlace(boxes, cols);
-        const holes = mosaicHoles(g);
-        if (!holes.length) break;
-
-        const alargaEsquerda = hole => {
-            const left = hole.c > 0 ? g[hole.r][hole.c - 1] : -1;
-            if (left < 0) return false;
-            const p = pos[left];
-            if (p.c + p.w !== hole.c || p.w + hole.w > cols) return false;
-            for (let i = 0; i < p.h; i++) for (let j = hole.c; j < hole.c + hole.w; j++)
-                if (g[p.r + i] && g[p.r + i][j] >= 0) return false;
-            boxes[left][0] += hole.w; return true;
-        };
-        const alargaDireita = hole => {
-            const right = hole.c + hole.w < cols ? g[hole.r][hole.c + hole.w] : -1;
-            if (right < 0) return false;
-            const p = pos[right];
-            if (p.r !== hole.r || p.c !== hole.c + hole.w || p.w + hole.w > cols) return false;
-            boxes[right][0] += hole.w; return true;
-        };
-        const estica = limite => hole => {
-            const up = hole.r > 0 ? g[hole.r - 1][hole.c] : -1;
-            if (up < 0) return false;
-            const p = pos[up];
-            if (p.c < hole.c || p.c + p.w > hole.c + hole.w) return false;
-            if (p.r + p.h !== hole.r || p.h >= limite) return false;
-            boxes[up][1] += 1; return true;
-        };
-
-        let changed = false;
-        for (const regra of [alargaEsquerda, alargaDireita, estica(2), estica(capH)]) {
-            for (const hole of holes) if (regra(hole)) { changed = true; break; }
-            if (changed) break;
-        }
-        if (!changed) break; // não dá para fechar; entrega o que já melhorou
-    }
-    return boxes;
 }
 
 // ==================== CENTRAL DE AUDITORIA: VISUALIZAÇÃO ====================
-// Paleta validada com scripts/validate_palette.js contra as superfícies REAIS
-// dos cards deste projeto (#fbfcfd claro / #131b28 escuro), não contra as do
-// arquivo de referência. Slots categóricos azul+laranja passam em todos os
-// gates nos dois temas (CVD ΔE 24,7 claro / 26,8 escuro).
+// Paleta do Painel Cívico, validada com scripts/validate_palette.js contra as
+// superfícies dos cards (#FFFFFF claro / #121925 escuro). Slots categóricos
+// azul da marca + laranja passam em todos os gates nos dois temas (CVD ΔE 30,1
+// claro / 27,6 escuro). No escuro a série usa #6B8FF0: o azul de texto
+// (#7EA2FF) sai da faixa de luminosidade para marcas de gráfico.
+// Rampas sequenciais de um só tom, monotônicas em L (OKLab) nos dois temas.
 //
 // Decisão de encoding: sucesso e falha NÃO são codificados por cor em gráfico.
 // O validador reprovou o par status good↔critical em ΔE 4,1 sob deuteranopia —
@@ -2166,28 +2058,28 @@ function mosaicSolve(sizes, cols, capH = 3, maxPass = 8) {
 // cores de status aparecem só onde há ícone + rótulo junto, nunca sozinhas.
 const VIZ = {
     light: {
-        surface: '#fbfcfd',
-        s1: '#2a78d6',          // slot categórico 1 — azul
+        surface: '#FFFFFF',
+        s1: '#1F4FD8',          // slot categórico 1 — azul da marca
         s2: '#eb6834',          // slot categórico 2 — laranja
-        grid: '#e1e0d9',
-        axis: '#c3c2b7',
-        ink: '#0f172a',
-        muted: '#55637a',
+        grid: '#E6EAF0',
+        axis: '#B9C3D3',
+        ink: '#0D1524',
+        muted: '#566275',
         // rampa sequencial azul, clara→escura (monotônica, verificada)
-        ramp: ['#eef4fd', '#cde2fb', '#9ec5f4', '#6da7ec', '#3987e5', '#2a78d6', '#184f95'],
-        good: '#0ca30c', warning: '#fab219', critical: '#d03b3b'
+        ramp: ['#EEF2FD', '#D3DEFB', '#A9BEF6', '#7D9CF0', '#4F78E6', '#1F4FD8', '#163A9E'],
+        good: '#0B7A6F', warning: '#94580A', critical: '#B42318'
     },
     dark: {
-        surface: '#131b28',
-        s1: '#3987e5',
+        surface: '#121925',
+        s1: '#6B8FF0',
         s2: '#d95926',
-        grid: '#2c3444',
-        axis: '#3c465a',
-        ink: '#f8fafc',
-        muted: '#a3b0c4',
+        grid: '#26334A',
+        axis: '#3A4A66',
+        ink: '#EEF2F8',
+        muted: '#9AA6B9',
         // no tema escuro o "quase zero" recua para a superfície: rampa escura→clara
-        ramp: ['#1b2434', '#123055', '#184f95', '#256abf', '#3987e5', '#6da7ec', '#9ec5f4'],
-        good: '#0ca30c', warning: '#fab219', critical: '#d03b3b'
+        ramp: ['#1A2233', '#1B2B4F', '#22397A', '#2D4EA8', '#4469D6', '#6B8FF0', '#A3BBF8'],
+        good: '#4FD1BF', warning: '#F2B65A', critical: '#FF8A80'
     }
 };
 
@@ -2419,38 +2311,40 @@ const MOSAIC_ACCENTS = {
 const mosaicAccent = (accent, darkMode) =>
     (MOSAIC_ACCENTS[accent] || MOSAIC_ACCENTS.blue)[darkMode ? 'dark' : 'light'];
 
-// Tons dos botões do cabeçalho. Pares claro/escuro validados a >= 3:1 do glifo
-// contra o próprio fundo tintado — amber-600 reprova no claro (2,74), por isso
-// o e-mail usa amber-700 lá e amber-400 aqui.
-const HEADER_TONES = {
-    theme: { light: '#4f46e5', dark: '#fbbf24' },
-    chat: { light: '#2563eb', dark: '#60a5fa' },
-    mail: { light: '#b45309', dark: '#fbbf24' }
-};
-
-const headerTone = (key, darkMode) => HEADER_TONES[key][darkMode ? 'dark' : 'light'];
-
-// Tons da navegação lateral. Rótulo de menu é texto pequeno (4,5:1), então o
-// texto do item ativo é o tom misturado ao título — o tom puro sobre o próprio
-// tint fica em ~3,8 e reprova.
-const SIDE_TONES = {
-    main: { light: '#2563eb', dark: '#60a5fa' },
-    admin: { light: '#dc2626', dark: '#f87171' }
-};
-
-const sideTone = (key, darkMode) => SIDE_TONES[key][darkMode ? 'dark' : 'light'];
-
-// Fonte única do avatar: o cabeçalho e o rodapé da sidebar mostravam o mesmo
-// usuário com desenhos diferentes (foto em squircle vs. inicial em círculo).
-const avatarFor = (user) => {
-    const primeiro = (user?.name?.split(' ')[0] || user?.username || '').toLowerCase();
-    const femininos = ['maria', 'ana', 'julia', 'juliana', 'fernanda', 'patricia', 'aline', 'bruna', 'camila', 'jessica', 'amanda', 'leticia', 'beatriz', 'vanessa', 'mariana', 'gabriela', 'larissa', 'daniela', 'carla', 'renata'];
-    const feminino = femininos.includes(primeiro) || primeiro.endsWith('a') || primeiro.endsWith('e');
-    return feminino ? 'image/mulher.png' : 'image/homem.png';
-};
-
 const iniciaisDe = (user) =>
     user?.name?.substring(0, 2).toUpperCase() || user?.username?.substring(0, 2).toUpperCase() || 'AD';
+
+// Agrupamento da Início. A ordem dentro de cada seção continua sendo a do
+// admin (drag & drop); um banner fora destas listas cai em "Outros serviços".
+const HOME_SECTIONS = [
+    { id: 'fiscal', title: 'Fiscal e tributário', keys: ['iss-cnae', 'pareceres', 'processos', 'painel-distribuicao', 'nfse-nacional', 'receita'] },
+    { id: 'municipio', title: 'Município e portais', keys: ['dte', 'diario-oficial', 'arrecadacao', 'entes', 'empresa-facil', 'biblioteca'] }
+];
+
+// Coluna de dados.json com a descrição do item da lista de serviços (CTM).
+const CAMPO_ITEM_LC = 'Descrição item da lista da Lei Complementar nº 001/2003 - CTM';
+
+// Rótulo da trilha no cabeçalho de cada tela.
+const VIEW_TITLES = {
+    profile: 'Meu Perfil',
+    search: 'Consulta ISS / CNAE',
+    outros: 'Serviços Internos',
+    'other-services': 'Serviços Internos',
+    'admin-dashboard': 'Auditoria',
+    'admin-users': 'Usuários',
+    'admin-banners': 'Banners',
+    'admin-tools': 'Ferramentas'
+};
+
+const dataPorExtenso = () => {
+    const s = new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+    return s.charAt(0).toUpperCase() + s.slice(1);
+};
+
+const saudacao = () => {
+    const h = new Date().getHours();
+    return h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite';
+};
 
 // Config estática dos banners (UI, cores, links)
 const BANNER_STATIC = {
@@ -3187,6 +3081,265 @@ function AdminBannersPanel({ darkMode }) {
 }
 // ========================================================================
 
+// ==================== CONSULTA ISS / CNAE ====================
+// Resultados na própria página: filtro por alíquota, linha selecionável e
+// painel de detalhe com o local de incidência (art. 3º da LC 116/2003).
+
+const formatCnae = (valor) => {
+    const digitos = String(valor ?? '').replace(/[^0-9]/g, '');
+    if (digitos.length >= 7) {
+        const d = digitos.padStart(7, '0');
+        return `${d.slice(0, 4)}-${d.slice(4, 5)}/${d.slice(5, 7)}`;
+    }
+    return String(valor ?? '');
+};
+
+const aliquotaNum = (a) => parseFloat(String(a).replace(',', '.')) || 0;
+
+const SEARCH_MODES = [
+    { id: 'all', label: 'Tudo' },
+    { id: 'text', label: 'Descrição' },
+    { id: 'lc', label: 'Item LC' },
+    { id: 'cnae', label: 'CNAE' }
+];
+
+const LIMITE_LINHAS = 300;
+
+function ConsultaIssCnae({ data, searchTerm, setSearchTerm, mode, setMode, results, lastQuery, onSearch, recent, getIncidence }) {
+    const [aliq, setAliq] = useState('all');
+    const [selIndex, setSelIndex] = useState(0);
+    const [copiado, setCopiado] = useState(false);
+
+    // Nova consulta: volta para "Todas" e seleciona a primeira linha.
+    useEffect(() => { setAliq('all'); setSelIndex(0); }, [results]);
+
+    const totalItens = useMemo(() => new Set((data || []).map(r => r['LIST LC'])).size, [data]);
+
+    const linhas = useMemo(() => (results || []).map((r, i) => ({ ...r, __i: i })), [results]);
+    const contagem = useMemo(() => {
+        const acc = {};
+        linhas.forEach(r => { acc[r['Alíquota']] = (acc[r['Alíquota']] || 0) + 1; });
+        return Object.entries(acc).sort((a, b) => aliquotaNum(a[0]) - aliquotaNum(b[0]));
+    }, [linhas]);
+
+    const visiveis = aliq === 'all' ? linhas : linhas.filter(r => r['Alíquota'] === aliq);
+    const atual = visiveis.find(r => r.__i === selIndex) || visiveis[0] || null;
+    const irmaos = atual
+        ? visiveis.filter(r => r['LIST LC'] === atual['LIST LC'] && r.__i !== atual.__i).slice(0, 6)
+        : [];
+
+    const submit = (e) => {
+        e.preventDefault();
+        onSearch(searchTerm, mode);
+    };
+
+    const trocarModo = (novo) => {
+        setMode(novo);
+        if (results !== null) onSearch(searchTerm, novo);
+    };
+
+    const exportarCSV = () => {
+        if (!visiveis.length) return;
+        const cab = ['Item LC', 'Descrição do item (CTM)', 'CNAE', 'Descrição do CNAE', 'Alíquota', 'Local de incidência'];
+        const rows = visiveis.map(r => [r['LIST LC'], r[CAMPO_ITEM_LC], formatCnae(r['CNAE']), r['Descrição do CNAE'], r['Alíquota'], getIncidence(r['LIST LC'])]);
+        const csv = [cab, ...rows].map(l => l.map(v => '"' + String(v ?? '').replace(/"/g, '""') + '"').join(';')).join('\n');
+        const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'consulta_iss_cnae_' + new Date().toISOString().split('T')[0] + '.csv';
+        a.click();
+        URL.revokeObjectURL(url);
+    };
+
+    const copiarCnae = async () => {
+        if (!atual) return;
+        try {
+            await navigator.clipboard.writeText(formatCnae(atual['CNAE']));
+            setCopiado(true);
+            setTimeout(() => setCopiado(false), 1600);
+        } catch (e) { /* área de transferência indisponível */ }
+    };
+
+    const alClass = (a) => {
+        const n = Math.round(aliquotaNum(a));
+        return `pc-al ${n >= 2 && n <= 4 ? 'pc-al--' + n : ''}`;
+    };
+
+    return (
+        <div className="flex flex-col gap-6 animate-fadeInUp">
+            <section className="pc-q">
+                <div>
+                    <h1 className="pc-q-title">Consulta ISS / CNAE</h1>
+                    <p className="pc-q-lead">Cruze os itens da lista de serviços da LC nº 001/2003 (CTM) com os códigos CNAE e encontre a alíquota aplicável.</p>
+                </div>
+
+                <form className="pc-q-bar" role="search" onSubmit={submit}>
+                    <label htmlFor="consulta-q" className="pc-sr-only">Pesquisar</label>
+                    <div className="pc-input pc-q-input">
+                        <PcIcon name="search" />
+                        <input
+                            id="consulta-q"
+                            type="search"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            placeholder="Descrição, item da LC (ex.: 04.03) ou CNAE (ex.: 8640-2/02)"
+                            autoComplete="off"
+                            autoFocus
+                        />
+                        <button type="submit" className="pc-btn pc-btn--primary" style={{ minHeight: '2.5rem' }}>Consultar</button>
+                    </div>
+                    <div className="pc-seg" role="group" aria-label="Pesquisar em">
+                        {SEARCH_MODES.map(m => (
+                            <button key={m.id} type="button" aria-pressed={mode === m.id} onClick={() => trocarModo(m.id)}>{m.label}</button>
+                        ))}
+                    </div>
+                </form>
+
+                {recent.length > 0 && (
+                    <div className="pc-recent">
+                        <span style={{ color: 'var(--pc-muted)', marginRight: '.25rem' }}>Recentes</span>
+                        {recent.map(q => (
+                            <button key={q} type="button" className="pc-recent-btn" onClick={() => { setSearchTerm(q); onSearch(q, mode); }}>
+                                <PcIcon name="history" size={14} />
+                                {q}
+                            </button>
+                        ))}
+                    </div>
+                )}
+            </section>
+
+            {results === null ? (
+                <section className="pc-detail" style={{ flex: 'none' }}>
+                    <div className="pc-empty" style={{ padding: '2.5rem 1rem' }}>
+                        <span className="pc-empty-ico"><PcIcon name="search" size={22} /></span>
+                        <strong>Faça uma consulta</strong>
+                        <span>Digite parte da descrição, o número do item da lista ou o código CNAE e pressione Enter.</span>
+                    </div>
+                </section>
+            ) : (
+                <>
+                    <section className="pc-q-toolbar">
+                        <p className="pc-q-count" role="status">
+                            <strong>{visiveis.length}</strong> {visiveis.length === 1 ? 'resultado' : 'resultados'}
+                            {lastQuery ? ` para “${lastQuery}”` : ' (base completa)'}
+                        </p>
+                        <div className="pc-q-filters">
+                            {contagem.length > 1 && (
+                                <>
+                                    <span style={{ fontSize: '.8125rem', color: 'var(--pc-muted)' }}>Alíquota</span>
+                                    <button type="button" className="pc-chip" aria-pressed={aliq === 'all'} onClick={() => setAliq('all')}>
+                                        Todas <span className="pc-chip-n">{linhas.length}</span>
+                                    </button>
+                                    {contagem.map(([a, n]) => (
+                                        <button key={a} type="button" className="pc-chip" aria-pressed={aliq === a} onClick={() => setAliq(a)}>
+                                            {a} <span className="pc-chip-n">{n}</span>
+                                        </button>
+                                    ))}
+                                </>
+                            )}
+                            <button type="button" className="pc-btn pc-btn--sm" onClick={exportarCSV} disabled={!visiveis.length}>
+                                <PcIcon name="download" size={16} />
+                                Exportar CSV
+                            </button>
+                        </div>
+                    </section>
+
+                    <section className="pc-q-split">
+                        <div className="pc-q-table">
+                            <div className="pc-q-table-scroll custom-scrollbar">
+                                <div className="pc-q-table-inner">
+                                    <div className="pc-q-grid pc-q-head" aria-hidden="true">
+                                        <span>Item LC</span><span>Serviço (CTM)</span><span>CNAE</span><span>Atividade CNAE</span><span style={{ textAlign: 'right' }}>Alíquota</span>
+                                    </div>
+                                    <div className="pc-q-rows custom-scrollbar">
+                                        {visiveis.slice(0, LIMITE_LINHAS).map(r => (
+                                            <button
+                                                key={r.__i}
+                                                type="button"
+                                                className="pc-q-row pc-q-grid"
+                                                aria-pressed={atual?.__i === r.__i}
+                                                onClick={() => setSelIndex(r.__i)}
+                                            >
+                                                <span className="pc-q-code">{r['LIST LC']}</span>
+                                                <span className="pc-q-txt pc-clip" title={r[CAMPO_ITEM_LC]}>{r[CAMPO_ITEM_LC]}</span>
+                                                <span className="pc-q-cnae">{formatCnae(r['CNAE'])}</span>
+                                                <span className="pc-q-txt pc-q-txt--ink pc-clip" title={r['Descrição do CNAE']}>{r['Descrição do CNAE']}</span>
+                                                <span style={{ textAlign: 'right' }}><span className={alClass(r['Alíquota'])}>{r['Alíquota']}</span></span>
+                                            </button>
+                                        ))}
+                                        {visiveis.length === 0 && (
+                                            <div className="pc-empty">
+                                                <span className="pc-empty-ico"><PcIcon name="search" size={22} /></span>
+                                                <strong>Nenhuma correspondência</strong>
+                                                <span>Tente um termo mais curto, o número do item da LC ou o código CNAE.</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                            {visiveis.length > LIMITE_LINHAS && (
+                                <p className="pc-q-foot">Mostrando {LIMITE_LINHAS} de {visiveis.length}. Refine a busca ou exporte o CSV para ver tudo.</p>
+                            )}
+                        </div>
+
+                        <aside className="pc-detail" aria-label="Detalhe da correspondência">
+                            {atual ? (
+                                <>
+                                    <div className="flex items-start justify-between gap-3">
+                                        <div className="flex flex-col gap-1">
+                                            <span className="pc-eyebrow">Item da lista</span>
+                                            <span className="pc-detail-lc">{atual['LIST LC']}</span>
+                                        </div>
+                                        <div className="flex flex-col items-end gap-1">
+                                            <span className="pc-eyebrow">Alíquota ISS</span>
+                                            <span className="pc-detail-al">{atual['Alíquota']}</span>
+                                        </div>
+                                    </div>
+                                    <p style={{ margin: 0, fontSize: '.9375rem', lineHeight: 1.55, color: 'var(--pc-ink-2)' }}>{atual[CAMPO_ITEM_LC]}</p>
+                                    <div className="pc-detail-box">
+                                        <div className="flex items-center justify-between gap-3">
+                                            <span className="pc-eyebrow">CNAE</span>
+                                            <button type="button" className="pc-btn pc-btn--sm" style={{ minHeight: '2rem' }} onClick={copiarCnae}>
+                                                <PcIcon name="copy" size={14} />
+                                                {copiado ? 'Copiado' : 'Copiar'}
+                                            </button>
+                                        </div>
+                                        <span className="pc-mono" style={{ fontSize: '1.125rem', fontWeight: 600 }}>{formatCnae(atual['CNAE'])}</span>
+                                        <span style={{ fontSize: '.875rem', lineHeight: 1.5, color: 'var(--pc-ink-2)' }}>{atual['Descrição do CNAE']}</span>
+                                    </div>
+                                    <div className="flex flex-col gap-1">
+                                        <span className="pc-eyebrow">Local de incidência (art. 3º LC 116)</span>
+                                        <span style={{ fontSize: '.875rem', fontWeight: 500 }}>{getIncidence(atual['LIST LC'])}</span>
+                                    </div>
+                                    <div className="flex flex-col gap-2">
+                                        <h2 style={{ margin: 0, fontSize: '.875rem', fontWeight: 600 }}>Outros CNAEs do item {atual['LIST LC']} nesta busca</h2>
+                                        {irmaos.length ? irmaos.map(r => (
+                                            <button key={r.__i} type="button" className="pc-detail-sib" onClick={() => setSelIndex(r.__i)}>
+                                                <span className="pc-mono" style={{ fontSize: '.8125rem', color: 'var(--pc-brand)', flex: 'none' }}>{formatCnae(r['CNAE'])}</span>
+                                                <span className="pc-clip" style={{ fontSize: '.8125rem', color: 'var(--pc-ink-2)' }}>{r['Descrição do CNAE']}</span>
+                                            </button>
+                                        )) : (
+                                            <span style={{ fontSize: '.8125rem', color: 'var(--pc-muted)' }}>Nenhum outro CNAE deste item nos resultados.</span>
+                                        )}
+                                    </div>
+                                </>
+                            ) : (
+                                <span style={{ fontSize: '.875rem', color: 'var(--pc-muted)' }}>Selecione um resultado para ver os detalhes.</span>
+                            )}
+                        </aside>
+                    </section>
+                </>
+            )}
+
+            <footer className="pc-q-note">
+                <span>Base: Lei Complementar nº 001/2003 — Código Tributário Municipal</span>
+                <span><span className="pc-mono">{totalItens}</span> itens · <span className="pc-mono">{(data || []).length.toLocaleString('pt-BR')}</span> correspondências CNAE</span>
+            </footer>
+        </div>
+    );
+}
+
 function App() {
     // Estados de autenticação
     const [isAuthenticated, setIsAuthenticated] = useState(() => {
@@ -3261,14 +3414,24 @@ function App() {
     const [data, setData] = useState([]);
     const [filteredData, setFilteredData] = useState([]);
     const [searchTerm, setSearchTerm] = useState('');
-    const [isLoading, setIsLoading] = useState(false);
+    const [searchMode, setSearchMode] = useState('all'); // all | text | lc | cnae
+    const [searchResults, setSearchResults] = useState(null); // null = nenhuma consulta feita ainda
+    const [lastQuery, setLastQuery] = useState('');
     const [darkMode, setDarkMode] = useState(() => {
         const saved = localStorage.getItem('darkMode');
         return saved ? JSON.parse(saved) : false;
     });
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [modalResults, setModalResults] = useState([]);
-    const [noResults, setNoResults] = useState(false);
+    // Últimas 5 consultas, guardadas por usuário neste navegador.
+    const recentKey = 'consultaRecentes:' + (currentUser?.username || 'anon');
+    const [recentSearches, setRecentSearches] = useState([]);
+    useEffect(() => {
+        try {
+            const saved = JSON.parse(localStorage.getItem(recentKey) || '[]');
+            setRecentSearches(Array.isArray(saved) ? saved.slice(0, 5) : []);
+        } catch (e) {
+            setRecentSearches([]);
+        }
+    }, [recentKey]);
 
 
 
@@ -3295,6 +3458,7 @@ function App() {
     const [bibliotecaModalOpen, setBibliotecaModalOpen] = useState(false);
     const [bibliotecaCategoria, setBibliotecaCategoria] = useState(null);
     const [bibliotecaSearch, setBibliotecaSearch] = useState('');
+    const [openGroup, setOpenGroup] = useState('iss-cnae'); // card de grupo aberto no accordion da Início
 
     const handleSortBanners = async () => {
         if (!currentUser || currentUser.role !== 'admin') return;
@@ -3692,10 +3856,10 @@ function App() {
             });
     }, []);
 
-    // Função para normalizar texto (remove espaços extras e converte para minúsculo)
+    // Função para normalizar texto (remove espaços extras, acentos e converte para minúsculo)
     const normalizeText = (text) => {
         if (!text) return '';
-        return text.toString().trim().toLowerCase();
+        return text.toString().trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
     };
 
     // Função para normalizar códigos removendo zeros à esquerda
@@ -3813,7 +3977,6 @@ function App() {
         const normalizedField = normalizeText(field);
         const normalizedTerm = normalizeText(term);
 
-        console.log(`Comparando: "${normalizedField}" com "${normalizedTerm}" (tipo: ${fieldType})`); // Debug
 
         // Se o termo é um código, aplica lógica específica por tipo de campo
         if (isCode(term)) {
@@ -3827,13 +3990,11 @@ function App() {
 
                     // 1. Busca exata após normalização
                     if (fieldCode === normalizedCodeTerm) {
-                        console.log(`Busca exata de LIST LC "${normalizedCodeTerm}" encontrada em "${fieldCode}": true`); // Debug
                         return true;
                     }
 
                     // 2. Busca parcial apenas se o termo termina com ponto (ex: "7." para buscar "7.01", "7.02", etc.)
                     if (normalizedTerm.endsWith('.') && fieldCode.startsWith(normalizedCodeTerm.slice(0, -1) + '.')) {
-                        console.log(`Busca parcial de LIST LC "${normalizedCodeTerm}" encontrada em "${fieldCode}": true`); // Debug
                         return true;
                     }
 
@@ -3841,13 +4002,11 @@ function App() {
                     if (!normalizedTerm.includes('.')) {
                         const exactPattern = new RegExp(`^${normalizedCodeTerm}\.`);
                         if (exactPattern.test(fieldCode)) {
-                            console.log(`Busca de categoria LIST LC "${normalizedCodeTerm}" encontrada em "${fieldCode}": true`); // Debug
                             return true;
                         }
                     }
                 }
 
-                console.log(`Busca de LIST LC "${normalizedTerm}" em "${normalizedField}": false`); // Debug
                 return false;
             }
 
@@ -3858,17 +4017,14 @@ function App() {
 
                 // 1. Busca exata após normalização
                 if (cleanField === cleanTerm) {
-                    console.log(`Busca exata de CNAE "${cleanTerm}" encontrada em "${cleanField}": true`); // Debug
                     return true;
                 }
 
                 // 2. Busca por início do código (busca parcial)
                 if (cleanField.startsWith(cleanTerm)) {
-                    console.log(`Busca parcial de CNAE "${cleanTerm}" encontrada no início de "${cleanField}": true`); // Debug
                     return true;
                 }
 
-                console.log(`Busca de CNAE "${cleanTerm}" em "${cleanField}": false`); // Debug
                 return false;
             }
 
@@ -3878,90 +4034,54 @@ function App() {
             if (fieldCodeMatch) {
                 const fieldCode = normalizeCode(fieldCodeMatch[1]);
                 if (fieldCode === normalizedCodeTerm) {
-                    console.log(`Busca exata de código "${normalizedCodeTerm}" encontrada em "${fieldCode}": true`); // Debug
                     return true;
                 }
             }
 
-            console.log(`Busca de código "${normalizedTerm}" em "${normalizedField}": false`); // Debug
             return false;
         } else {
             // Para descrições, busca por inclusão
             const result = normalizedField.includes(normalizedTerm);
-            console.log(`Busca de descrição "${normalizedTerm}" em "${normalizedField}": ${result}`); // Debug
             return result;
         }
     };
 
-    const filterData = () => {
-        console.log('Iniciando filterData...'); // Debug
-        console.log('Dados disponíveis:', data?.length || 0); // Debug
+    // Campos consultados por modo de busca (segmentado da Consulta ISS / CNAE).
+    const SEARCH_FIELDS = {
+        all: [['LIST LC', 'listlc'], [CAMPO_ITEM_LC, 'description'], ['CNAE', 'cnae'], ['Descrição do CNAE', 'description']],
+        text: [[CAMPO_ITEM_LC, 'description'], ['Descrição do CNAE', 'description']],
+        lc: [['LIST LC', 'listlc']],
+        cnae: [['CNAE', 'cnae']]
+    };
 
-        if (!data || data.length === 0) {
-            console.log('Nenhum dado disponível'); // Debug
-            return [];
-        }
+    const filterData = (term, mode = 'all') => {
+        if (!data || data.length === 0) return [];
+        if (!term.trim()) return data;
+        const campos = SEARCH_FIELDS[mode] || SEARCH_FIELDS.all;
+        return data.filter(item => campos.some(([campo, tipo]) => assertiveSearch(item[campo], term, tipo)));
+    };
 
-        let filtered = data;
+    const handleSearch = (termo = searchTerm, mode = searchMode) => {
+        const query = termo.trim();
+        const results = filterData(termo, mode);
+        setSearchResults(results);
+        setLastQuery(query);
 
-        if (searchTerm.trim()) {
-            console.log('Filtrando por termo geral:', searchTerm); // Debug
-            filtered = filtered.filter(item => {
-                const match = assertiveSearch(item['LIST LC'], searchTerm, 'listlc') ||
-                    assertiveSearch(item['Descrição item da lista da Lei Complementar nº 001/2003 - CTM'], searchTerm, 'description') ||
-                    assertiveSearch(item['CNAE'], searchTerm, 'cnae') ||
-                    assertiveSearch(item['Descrição do CNAE'], searchTerm, 'description');
-
-                if (match) {
-                    console.log('Item encontrado:', item['LIST LC']); // Debug
-                }
-                return match;
+        if (query) {
+            setRecentSearches(prev => {
+                const next = [query, ...prev.filter(q => q.toLowerCase() !== query.toLowerCase())].slice(0, 5);
+                try { localStorage.setItem(recentKey, JSON.stringify(next)); } catch (e) { /* armazenamento indisponível */ }
+                return next;
             });
         }
 
-        console.log('Resultados filtrados:', filtered.length); // Debug
-        return filtered;
-    };
-
-
-
-    const handleSearch = () => {
-        setIsLoading(true);
-
-        // Preparar dados da consulta para estatísticas
-        const queryData = {
-            searchTerm: searchTerm.trim()
-        };
-
-        const queryString = Object.values(queryData).filter(v => v).join(' | ');
-
-        setTimeout(() => {
-            const results = filterData();
-            setModalResults(results);
-            setNoResults(results.length === 0);
-            setIsModalOpen(true);
-            setIsLoading(false);
-
-            // Registrar pesquisa nas estatísticas
-            updateStatistics('search', {
-                searchMode: 'combined',
-                user: currentUser?.username || 'unknown',
-                query: queryString || 'consulta vazia',
-                results: results.length
-            });
-        }, 500);
-    };
-
-    const handleSearchKeyDown = (e) => {
-        if (e.key !== 'Enter' || e.nativeEvent?.isComposing || isLoading) return;
-        e.preventDefault();
-        handleSearch();
-    };
-
-    const closeModal = () => {
-        setIsModalOpen(false);
-        setModalResults([]);
-        setNoResults(false);
+        // Registrar pesquisa nas estatísticas
+        updateStatistics('search', {
+            searchMode: mode === 'all' ? 'combined' : mode,
+            user: currentUser?.username || 'unknown',
+            query: query || 'consulta vazia',
+            results: results.length
+        });
     };
 
     if (isSessionValidating) {
@@ -4011,9 +4131,7 @@ function App() {
     }
 
     return (
-        <div className="flex h-screen overflow-hidden relative">
-
-
+        <div className="pc-app">
 
             {/* Overlay da Tela de Bloqueio por inatividade (Sobreposto na UI Atual) */}
             {isLockedOut && (
@@ -4102,18 +4220,18 @@ function App() {
                 `}} />
             )}
             <Sidebar
-                darkMode={darkMode}
                 currentView={currentView}
                 setCurrentView={setCurrentView}
                 currentUser={currentUser}
                 onLogout={handleLogout}
                 sidebarMobileOpen={sidebarMobileOpen}
                 onCloseSidebar={() => setSidebarMobileOpen(false)}
+                pendingCount={pendingUsers.length}
             />
             {/* Overlay do menu lateral no mobile */}
             {sidebarMobileOpen && (
                 <div
-                    className="sidebar-overlay active md:hidden"
+                    className="pc-side-overlay md:hidden"
                     onClick={() => setSidebarMobileOpen(false)}
                     aria-hidden="true"
                 />
@@ -4173,166 +4291,89 @@ function App() {
                 </div>
             )}
 
-            <div className="flex-1 overflow-y-auto">
-                <div className={`min-h-screen transition-all duration-500 ${darkMode ? 'bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900' : 'bg-gradient-to-br from-gray-100 via-gray-50 to-gray-100'}`}>
-                    <div className="container mx-auto px-4 py-8 max-w-6xl">
-                        <header className={`hud-header relative z-[20] hud ${darkMode ? 'is-dark' : ''}`}>
-                            {/* Barra: perfil à esquerda, marca ao centro, atalhos à direita. */}
-                            <div className="hud-bar pt-2 px-2">
-
-                                {/* Grupo Esquerdo: Menu Mobile e Perfil/Saudação */}
-                                <div className="flex items-center gap-3 animate-fadeInLeft">
-                                    <button
-                                        type="button"
-                                        onClick={() => setSidebarMobileOpen(true)}
-                                        className="sidebar-toggle-mobile md:hidden hud-btn"
-                                        style={{ '--tone': headerTone('chat', darkMode) }}
-                                        aria-label="Abrir menu"
-                                    >
-                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                                        </svg>
-                                    </button>
-
-                                    {/* Botão Voltar ou Perfil */}
-                                    {currentView !== 'home' ? (
-                                        <button
-                                            onClick={() => setCurrentView('home')}
-                                            className="hud-panel gap-2 px-4 py-2.5 font-bold text-sm"
-                                            style={{ '--tone': headerTone('chat', darkMode) }}
-                                        >
-                                            <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-                                            </svg>
-                                            <span>Início</span>
-                                        </button>
-                                    ) : (
-                                        currentUser && (
-                                            <div className="flex items-center gap-3">
-                                                <button
-                                                    onClick={() => setDarkMode(!darkMode)}
-                                                    className="hud-btn"
-                                                    style={{ '--tone': headerTone('theme', darkMode) }}
-                                                    aria-label={darkMode ? 'Ativar modo claro' : 'Ativar modo escuro'}
-                                                >
-                                                    {darkMode ? (
-                                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
-                                                        </svg>
-                                                    ) : (
-                                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
-                                                        </svg>
-                                                    )}
-                                                    <span className="hud-tip" style={{ right: 'auto', left: 0 }}>
-                                                        {darkMode ? 'Modo Claro' : 'Modo Escuro'}
-                                                    </span>
-                                                </button>
-
-                                                <div className="hud-panel gap-3 pl-2.5 pr-4 py-2.5">
-                                                    <div className="hud-avatar">
-                                                        <img
-                                                            src={avatarFor(currentUser)}
-                                                            alt=""
-                                                            onError={(e) => {
-                                                                e.target.style.display = 'none';
-                                                                e.target.nextSibling.style.display = 'flex';
-                                                            }}
-                                                        />
-                                                        <span className="absolute inset-0 items-center justify-center text-white font-bold text-xs tracking-widest" style={{ display: 'none' }}>
-                                                            {iniciaisDe(currentUser)}
-                                                        </span>
-                                                        <span className="hud-status"></span>
-                                                    </div>
-                                                    <div className="hidden sm:block">
-                                                        <h2 className="hud-name">
-                                                            {currentUser.name?.split(' ')[0] || currentUser.username}
-                                                        </h2>
-                                                        <p className="hud-greet">
-                                                            {new Date().getHours() < 12 ? 'Bom dia' : new Date().getHours() < 18 ? 'Boa tarde' : 'Boa noite'}
-                                                        </p>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        )
-                                    )}
-                                </div>
-
-                                {/* Marca central — mesma linha do destaque do usuário. Fica
-                                    absolutamente centrada na barra a partir de lg, para o centro
-                                    ser o da tela e não o sobrante entre grupos de larguras
-                                    diferentes; abaixo disso quebra para a própria linha. */}
-                                {currentView === 'home' && (
-                                    <div className="hud-brand hud-brand--bar animate-fadeInDown">
-                                        <div className="hud-brand-glow" aria-hidden="true"></div>
-                                        <img
-                                            src="image/ecossistema3.png"
-                                            alt=""
-                                            className="hud-brand-mark"
-                                        />
-                                        <span className="hud-brand-sep" aria-hidden="true"></span>
-                                        <div className="hud-brand-text">
-                                            <h1 className="hud-brand-title">Painel DIAAF</h1>
-                                        </div>
+            <div className="pc-scroll">
+                <div>
+                    <div className="pc-main" role="main">
+                        <header className="pc-top">
+                            <div className="pc-top-id">
+                                <button
+                                    type="button"
+                                    onClick={() => setSidebarMobileOpen(true)}
+                                    className="pc-iconbtn pc-only-mobile"
+                                    aria-label="Abrir menu"
+                                >
+                                    <PcIcon name="menu" />
+                                </button>
+                                {currentView === 'home' ? (
+                                    <div className="min-w-0">
+                                        <p className="pc-top-date">{dataPorExtenso()}</p>
+                                        <h1 className="pc-top-title">
+                                            {saudacao()}{currentUser ? `, ${currentUser.name?.split(' ')[0] || currentUser.username}` : ''}
+                                        </h1>
                                     </div>
+                                ) : (
+                                    <nav className="pc-crumbs" aria-label="Trilha">
+                                        <button type="button" onClick={() => setCurrentView('home')}>Início</button>
+                                        <span aria-hidden="true">/</span>
+                                        <span aria-current="page">{VIEW_TITLES[currentView] || ''}</span>
+                                    </nav>
                                 )}
-
-                                {/* Grupo Direito: Atalhos externos */}
-                                <div className="flex items-center gap-3 animate-fadeInRight">
-                                    {currentView === 'home' && (
-                                        <>
-                                            <a
-                                                href="https://app.bbgov360.com.br/atendimento?id=8340618"
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="hud-btn"
-                                                style={{ '--tone': headerTone('chat', darkMode) }}
-                                                aria-label="Atendimento Virtual"
-                                            >
-                                                <span className="hud-glyph" style={{ '--glyph-src': "url('image/NextChat.png')" }}></span>
-                                                <span className="hud-dot"></span>
-                                                <span className="hud-tip">Atendimento Virtual</span>
-                                            </a>
-
-                                            <a
-                                                href="https://mail.imperatriz.ma.gov.br/"
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="hud-btn"
-                                                style={{ '--tone': headerTone('mail', darkMode) }}
-                                                aria-label="E-mail Institucional"
-                                            >
-                                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                                                </svg>
-                                                <span className="hud-dot"></span>
-                                                <span className="hud-tip">E-mail Institucional</span>
-                                            </a>
-                                        </>
-                                    )}
-                                </div>
                             </div>
 
-                            {/* Cabeçalho de Consulta Exclusivo da página Buscar */}
-                            {currentView === 'search' && (
-                                <div className="text-center animate-fadeInDown mt-10 mb-2">
-                                    <h1 className={`text-4xl md:text-5xl font-extrabold mb-4 bg-gradient-to-r from-blue-600 via-cyan-500 to-indigo-600 bg-clip-text text-transparent`}>
-                                        Consulta Lista/Cnae/Alíquota
-                                    </h1>
-                                    <p className={`text-lg md:text-xl mb-6 font-light ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
-                                        Consulte itens da Lista de Serviços e suas respectivas alíquotas do ISS
-                                    </p>
-                                    <div className={`inline-flex items-center px-5 py-2.5 rounded-full text-sm font-medium shadow-sm transition-colors ${darkMode ? 'bg-gray-800/80 text-blue-300 border border-gray-700' : 'bg-white/80 text-blue-700 border border-blue-100'} backdrop-blur-sm`}>
-                                        <div className="status-indicator status-active mr-2"></div>
-                                        Sistema Online • {data.length} itens
-                                        {currentUser?.role === 'admin' && (
-                                            <span className="ml-3 px-2 py-0.5 bg-red-500/90 text-white text-[10px] uppercase font-bold tracking-wider rounded-md">
-                                                Admin
-                                            </span>
-                                        )}
-                                    </div>
-                                </div>
-                            )}
+                            <div className="pc-top-tools">
+                                {currentView === 'home' && (
+                                    <form
+                                        role="search"
+                                        className="pc-input pc-top-search"
+                                        onSubmit={(e) => {
+                                            e.preventDefault();
+                                            if (!searchTerm.trim()) return;
+                                            setCurrentView('search');
+                                            handleSearch();
+                                        }}
+                                    >
+                                        <label htmlFor="home-search" className="pc-sr-only">Consultar CNAE, item da LC ou atividade</label>
+                                        <PcIcon name="search" size={18} />
+                                        <input
+                                            id="home-search"
+                                            type="search"
+                                            value={searchTerm}
+                                            onChange={(e) => setSearchTerm(e.target.value)}
+                                            placeholder="Consultar CNAE, item da LC ou atividade"
+                                            style={{ fontSize: '.875rem' }}
+                                        />
+                                    </form>
+                                )}
+                                <a
+                                    href="https://app.bbgov360.com.br/atendimento?id=8340618"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="pc-iconbtn"
+                                    aria-label="Atendimento Virtual"
+                                >
+                                    <img src="image/NextChat.png" alt="" />
+                                    <span className="pc-tip">Atendimento Virtual</span>
+                                </a>
+                                <a
+                                    href="https://mail.imperatriz.ma.gov.br/"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="pc-iconbtn"
+                                    aria-label="E-mail Institucional"
+                                >
+                                    <PcIcon name="mail" size={18} />
+                                    <span className="pc-tip">E-mail Institucional</span>
+                                </a>
+                                <button
+                                    type="button"
+                                    onClick={() => setDarkMode(!darkMode)}
+                                    className="pc-iconbtn"
+                                    aria-label={darkMode ? 'Ativar modo claro' : 'Ativar modo escuro'}
+                                >
+                                    <PcIcon name={darkMode ? 'sun' : 'moon'} size={18} />
+                                    <span className="pc-tip">{darkMode ? 'Modo claro' : 'Modo escuro'}</span>
+                                </button>
+                            </div>
                         </header>
 
                         {/* Navegação condicional entre views */}
@@ -4351,305 +4392,275 @@ function App() {
                                 .filter(b => (BANNER_STATIC[b.key]?.menu || 'home') === 'home')
                                 .filter(b => isAdmin || b.enabled);
 
-                            // Spans resolvidos por breakpoint. Cada largura de grade tem o seu
-                            // empacotamento — não dá para derivar um do outro por proporção.
-                            const sizeList = homeBanners.map(b => BANNER_STATIC[b.key]?.size || 'std');
-                            const spanLg = mosaicSolve(sizeList, 12);
-                            const spanMd = mosaicSolve(sizeList, 6);
-                            const spanSm = mosaicSolve(sizeList, 2);
+                            const track = (label) => updateStatistics('bannerClick', {
+                                bannerLabel: label,
+                                user: currentUser ? currentUser.username : 'Visitante'
+                            });
 
-                            return (
-                            <div className="animate-fadeInUp space-y-4">
-                                {/* Empacotamento denso para todos, admin inclusive. Sem ele, um card de
-                                    6 colunas que não cabe nas 3 restantes deixa um buraco na fileira —
-                                    e o admin acabava arrumando um layout diferente do que o usuário vê.
-                                    O arraste continua correto porque o alvo do drop é um elemento
-                                    (o card sob o cursor), não uma célula geométrica da grade. */}
-                                <div className="mosaic-grid mt-1 is-dense">
-                                    {homeBanners
-                                        .map((banner, index) => {
-                                            const s = BANNER_STATIC[banner.key];
-                                            if (!s) return null;
-                                            const isDisabledForUser = !banner.enabled && !isAdmin;
-                                            const isFrozen = banner.isFrozen === true;
-                                            const isEffectivelyFrozen = isFrozen && !isAdmin;
-                                            const isInert = isDisabledForUser || s.comingSoon || isEffectivelyFrozen;
-
-                                            const size = s.size || 'std';
-                                            const accent = mosaicAccent(s.accent, darkMode);
-
-                                            // Os subserviços vivem só nas pílulas: cada uma carrega a própria
-                                            // ação, e a lista não é truncada — truncar deixaria serviço
-                                            // inalcançável agora que não há mais painel expansível.
-                                            const subItems = (() => {
-                                                const keys = banner.key === 'dte' ? DTE_SUB_BANNERS_KEYS
-                                                    : banner.key === 'iss-cnae' ? CONSULTAS_FISCAIS_SUB_BANNERS_KEYS
-                                                        : [];
-                                                if (keys.length) {
-                                                    return keys
-                                                        .filter(k => bannerConfig.find(bc => bc.key === k)?.enabled !== false)
-                                                        .map(k => {
-                                                            const sub = BANNER_STATIC[k];
-                                                            if (!sub) return null;
-                                                            return {
-                                                                id: k,
-                                                                label: sub.label,
-                                                                href: sub.isInternal ? null : sub.href,
-                                                                onSelect: sub.isInternal ? () => setCurrentView(sub.view) : null
-                                                            };
-                                                        })
-                                                        .filter(Boolean);
-                                                }
-                                                if (s.modalId === 'biblioteca') {
-                                                    return BIBLIOTECA_CATEGORIAS.map(cat => ({
-                                                        id: cat.id,
-                                                        label: cat.label,
-                                                        href: null,
-                                                        onSelect: () => {
-                                                            setBibliotecaCategoria(cat.id);
-                                                            setBibliotecaModalOpen(true);
-                                                        }
-                                                    }));
-                                                }
-                                                return [];
-                                            })();
-                                            // Card de grupo: não é clicável em si, as pílulas é que levam a algum lugar.
-                                            const isGroup = subItems.length > 0;
-                                            const chipsLocked = isInert;
-
-                                            const isDropTarget = isAdmin
-                                                && dragOverBannerId === banner.id
-                                                && isDraggingBanners;
-
-                                            const cardClass = `mosaic-card mosaic-item mosaic-item--${size} ${darkMode ? 'is-dark' : ''
-                                                } ${isInert ? 'is-inert' : ''} ${isDisabledForUser ? 'is-muted' : ''
-                                                } ${isGroup ? 'is-group' : ''
-                                                } ${isDropTarget ? 'is-drop-target' : ''
-                                                } ${isAdmin ? 'is-admin cursor-pointer active:cursor-grabbing' : ''}`;
-                                            // --i alimenta o atraso escalonado da animação de entrada (teto em 11
-                                            // para a última fileira não demorar demais a aparecer).
-                                            // --sp-*/--rw-* são os spans resolvidos pelo empacotador; o CSS
-                                            // escolhe o par certo por media query.
-                                            const cardStyle = {
-                                                '--accent': accent,
-                                                '--i': Math.min(index, 11),
-                                                '--sp-lg': spanLg[index]?.[0] ?? 3,
-                                                '--rw-lg': spanLg[index]?.[1] ?? 1,
-                                                '--sp-md': spanMd[index]?.[0] ?? 3,
-                                                '--rw-md': spanMd[index]?.[1] ?? 1,
-                                                '--sp-sm': spanSm[index]?.[0] ?? 1,
-                                                '--rw-sm': spanSm[index]?.[1] ?? 1
+                            // Subserviços de um card de grupo (accordion). Lista completa, nunca truncada.
+                            const subItemsFor = (banner, s) => {
+                                const keys = banner.key === 'dte' ? DTE_SUB_BANNERS_KEYS
+                                    : banner.key === 'iss-cnae' ? CONSULTAS_FISCAIS_SUB_BANNERS_KEYS
+                                        : [];
+                                if (keys.length) {
+                                    return keys
+                                        .filter(k => bannerConfig.find(bc => bc.key === k)?.enabled !== false)
+                                        .map(k => {
+                                            const sub = BANNER_STATIC[k];
+                                            if (!sub) return null;
+                                            return {
+                                                id: k,
+                                                label: sub.label,
+                                                desc: sub.description,
+                                                icon: sub.icon,
+                                                imageIcon: sub.imageIcon,
+                                                href: sub.isInternal ? null : sub.href,
+                                                tag: sub.isInternal ? 'Interno' : 'Externo',
+                                                onSelect: sub.isInternal ? () => setCurrentView(sub.view || 'search') : null
                                             };
+                                        })
+                                        .filter(Boolean);
+                                }
+                                if (s.modalId === 'biblioteca') {
+                                    return BIBLIOTECA_CATEGORIAS.map(cat => ({
+                                        id: cat.id,
+                                        label: cat.label,
+                                        desc: cat.description,
+                                        icon: cat.icon,
+                                        href: null,
+                                        tag: `${cat.links.length} ${cat.links.length === 1 ? 'item' : 'itens'}`,
+                                        onSelect: () => {
+                                            setBibliotecaCategoria(cat.id);
+                                            setBibliotecaModalOpen(true);
+                                        }
+                                    }));
+                                }
+                                return [];
+                            };
+                            const unidade = (banner) => BANNER_STATIC[banner.key]?.modalId === 'biblioteca' ? 'categorias' : 'serviços';
 
-                                            const content = (
-                                                <>
-                                                    <div className="mosaic-head">
-                                                        <div className={`mosaic-icon ${s.imageIcon ? 'mosaic-icon--img' : ''}`}>
-                                                            {s.imageIcon ? (
-                                                                <img src={s.imageIcon} alt="" loading="lazy" />
-                                                            ) : (
-                                                                <svg className={size === 'hero' ? 'w-7 h-7' : 'w-6 h-6'} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d={s.icon} />
-                                                                </svg>
-                                                            )}
-                                                        </div>
-                                                        {!isAdmin && !isInert && !isGroup && (
-                                                            <span className="mosaic-arrow" aria-hidden="true">
-                                                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M17 8l4 4m0 0l-4 4m4-4H3" /></svg>
-                                                            </span>
-                                                        )}
-                                                        {isAdmin && (
-                                                            <div className="mosaic-admin" onClick={e => e.stopPropagation()}>
-                                                                <div className={`text-[9px] font-black uppercase tracking-tighter ${isFrozen ? (banner.freezeReason === 'construction' ? 'text-amber-500' : 'text-red-500 animate-pulse') : (darkMode ? 'text-green-400' : 'text-green-600')}`}>
-                                                                    {isFrozen ? (banner.freezeReason === 'construction' ? 'EM OBRAS' : 'REVISÃO') : 'ATIVO'}
-                                                                </div>
-                                                                <button
-                                                                    onClick={(e) => {
-                                                                        e.preventDefault();
-                                                                        e.stopPropagation();
-                                                                        if (isFrozen) {
-                                                                            handleFreezeToggleGlobal(banner);
-                                                                        } else {
-                                                                            setFreezeModalBanner(banner);
-                                                                        }
-                                                                    }}
-                                                                    className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${isFrozen ? (banner.freezeReason === 'construction' ? 'bg-amber-500' : 'bg-red-500') : (darkMode ? 'bg-gray-600' : 'bg-gray-300')}`}
-                                                                    title={isFrozen ? "Descongelar serviço" : "Congelar serviço"}
-                                                                >
-                                                                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${isFrozen ? 'translate-x-4' : 'translate-x-0'}`} />
-                                                                </button>
-                                                            </div>
-                                                        )}
-                                                    </div>
+                            const tile = (s, size = 20) => (
+                                <span className={`pc-tile ${s.imageIcon ? 'pc-tile--img' : ''}`}>
+                                    {s.imageIcon ? (
+                                        <img src={s.imageIcon} alt="" loading="lazy" />
+                                    ) : (
+                                        <svg width={size} height={size} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d={s.icon} />
+                                        </svg>
+                                    )}
+                                </span>
+                            );
 
-                                                    <div className="mosaic-body">
-                                                        <h3 className="mosaic-title">{s.label || banner.label}</h3>
-                                                        <p className="mosaic-desc">{s.description}</p>
+                            const renderCard = (banner, index) => {
+                                const s = BANNER_STATIC[banner.key];
+                                if (!s) return null;
+                                const isDisabledForUser = !banner.enabled && !isAdmin;
+                                const isFrozen = banner.isFrozen === true;
+                                const isEffectivelyFrozen = isFrozen && !isAdmin;
+                                const isInert = isDisabledForUser || s.comingSoon || isEffectivelyFrozen;
+                                const subItems = subItemsFor(banner, s);
+                                const isGroup = subItems.length > 0;
+                                const isOpen = isGroup && openGroup === banner.key;
+                                const isDropTarget = isAdmin && isDraggingBanners && dragOverBannerId === banner.id;
+                                const label = s.label || banner.label;
+                                const construcao = banner.freezeReason === 'construction';
 
-                                                        {s.comingSoon && !isFrozen && (
-                                                            <span className={`mt-1.5 self-start inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold ${darkMode ? 'bg-amber-500/10 text-amber-400' : 'bg-amber-50 text-amber-700'}`}>
-                                                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" /></svg>
-                                                                Em Construção
-                                                            </span>
-                                                        )}
+                                // Índice no bannerConfig completo: é ele que handleSortBanners reordena.
+                                const configIndex = bannerConfig.findIndex(b => b.id === banner.id);
+                                const dragProps = isAdmin ? {
+                                    draggable: true,
+                                    onDragStart: (e) => {
+                                        dragItem.current = configIndex;
+                                        e.currentTarget.classList.add('opacity-50');
+                                        setIsDraggingBanners(true);
+                                    },
+                                    onDragEnter: () => {
+                                        dragOverItem.current = configIndex;
+                                        setDragOverBannerId(banner.id);
+                                    },
+                                    onDragEnd: (e) => {
+                                        e.currentTarget.classList.remove('opacity-50');
+                                        setIsDraggingBanners(false);
+                                        setDragOverBannerId(null);
+                                        handleSortBanners();
+                                    },
+                                    onDragOver: (e) => e.preventDefault()
+                                } : {};
 
-                                                        {isGroup && (
-                                                            <div className="mosaic-chips">
-                                                                {subItems.map(item => {
-                                                                    if (chipsLocked) {
-                                                                        return <span key={item.id} className="mosaic-chip">{item.label}</span>;
-                                                                    }
-                                                                    const track = () => updateStatistics('bannerClick', {
-                                                                        bannerLabel: item.label,
-                                                                        user: currentUser ? currentUser.username : 'Visitante'
-                                                                    });
-                                                                    return item.href ? (
-                                                                        <a
-                                                                            key={item.id}
-                                                                            href={item.href}
-                                                                            target="_blank"
-                                                                            rel="noopener noreferrer"
-                                                                            className="mosaic-chip"
-                                                                            onClick={track}
-                                                                            /* Âncora é arrastável por padrão e sequestraria o
-                                                                               drag de reordenação do card no modo admin. */
-                                                                            draggable={false}
-                                                                        >
-                                                                            {item.label}
-                                                                        </a>
-                                                                    ) : (
-                                                                        <button
-                                                                            key={item.id}
-                                                                            type="button"
-                                                                            className="mosaic-chip"
-                                                                            onClick={() => { track(); item.onSelect(); }}
-                                                                        >
-                                                                            {item.label}
-                                                                        </button>
-                                                                    );
-                                                                })}
-                                                            </div>
-                                                        )}
-                                                    </div>
+                                // Ação principal: um único elemento interativo, esticado sobre o card.
+                                let action = <span>{label}</span>;
+                                if (!isInert) {
+                                    if (isGroup) {
+                                        action = (
+                                            <button
+                                                type="button"
+                                                className="pc-card-hit"
+                                                aria-expanded={isOpen}
+                                                aria-controls={`grupo-${banner.key}`}
+                                                onClick={() => setOpenGroup(isOpen ? null : banner.key)}
+                                            >
+                                                {label}
+                                            </button>
+                                        );
+                                    } else if (s.isInternal) {
+                                        action = (
+                                            <button
+                                                type="button"
+                                                className="pc-card-hit"
+                                                onClick={() => { track(label); setCurrentView(s.view || 'search'); }}
+                                            >
+                                                {label}
+                                            </button>
+                                        );
+                                    } else {
+                                        action = (
+                                            <a
+                                                href={s.href}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="pc-card-hit"
+                                                draggable={false}
+                                                onClick={() => track(label)}
+                                            >
+                                                {label}
+                                            </a>
+                                        );
+                                    }
+                                }
 
-                                                    {isAdmin && (
-                                                        <span className="mosaic-drag" aria-hidden="true">
-                                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" /></svg>
-                                                        </span>
-                                                    )}
-
-                                                    {isFrozen && !isAdmin && (
-                                                        <div className="mosaic-veil animate-fadeIn">
-                                                            <div className={`px-3.5 py-2 rounded-xl shadow-lg border backdrop-blur-md flex items-center gap-2 ${banner.freezeReason === 'construction'
-                                                                ? 'bg-amber-500/90 border-amber-400 text-white'
-                                                                : 'bg-red-500/90 border-red-400 text-white'
-                                                                }`}>
-                                                                {banner.freezeReason === 'construction' ? (
-                                                                    <svg className="w-5 h-5 animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" /></svg>
-                                                                ) : (
-                                                                    <svg className="w-5 h-5 animate-spin-slow" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                                                                )}
-                                                                <span className="font-bold text-xs tracking-wide">
-                                                                    {banner.freezeReason === 'construction' ? 'EM CONSTRUÇÃO' : 'EM MANUTENÇÃO'}
-                                                                </span>
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                </>
-                                            );
-
-                                            const dragProps = isAdmin ? {
-                                                draggable: true,
-                                                onDragStart: (e) => {
-                                                    dragItem.current = index;
-                                                    e.currentTarget.classList.add('opacity-50', 'scale-95');
-                                                    setIsDraggingBanners(true); // Ativa injeção CSS global
-                                                },
-                                                onDragEnter: (e) => {
-                                                    dragOverItem.current = index;
-                                                    // Com o empacotamento denso a posição visual não segue a
-                                                    // ordem do array, então o alvo do drop precisa ser explícito.
-                                                    setDragOverBannerId(banner.id);
-                                                },
-                                                onDragEnd: (e) => {
-                                                    e.currentTarget.classList.remove('opacity-50', 'scale-95');
-                                                    setIsDraggingBanners(false); // Desativa injeção CSS global
-                                                    setDragOverBannerId(null);
-                                                    handleSortBanners();
-                                                },
-                                                onDragOver: (e) => e.preventDefault()
-                                            } : {};
-
-                                            // Card de grupo: é contêiner, não link. Quem leva a algum lugar
-                                            // são as pílulas de subserviço — o painel expansível foi removido.
-                                            if (s.isModal || isGroup) {
-                                                return (
-                                                    <div
-                                                        key={banner.id}
-                                                        className={cardClass}
-                                                        style={cardStyle}
-                                                        {...dragProps}
-                                                    >
-                                                        {content}
-                                                    </div>
-                                                );
-                                            }
-                                            if (s.isInternal) {
-                                                return (
+                                return (
+                                    <div
+                                        key={banner.id}
+                                        className={`pc-card ${isInert ? 'is-inert' : ''} ${isDisabledForUser ? 'is-muted' : ''} ${isOpen ? 'is-open' : ''} ${isDropTarget ? 'is-drop-target' : ''} ${isAdmin ? 'is-admin' : ''}`}
+                                        style={{ '--accent': mosaicAccent(s.accent, darkMode), '--i': Math.min(index, 11) }}
+                                        {...dragProps}
+                                    >
+                                        <div className="pc-card-head">
+                                            {tile(s)}
+                                            {isAdmin ? (
+                                                <div className="pc-admin">
+                                                    <span className={`pc-badge ${isFrozen ? (construcao ? 'pc-badge--warn' : 'pc-badge--crit') : 'pc-badge--ok'}`}>
+                                                        {isFrozen ? (construcao ? 'Em obras' : 'Revisão') : 'Ativo'}
+                                                    </span>
                                                     <button
-                                                        key={banner.id}
+                                                        type="button"
+                                                        role="switch"
+                                                        aria-checked={isFrozen}
+                                                        aria-label={isFrozen ? `Descongelar ${label}` : `Congelar ${label}`}
+                                                        title={isFrozen ? 'Descongelar serviço' : 'Congelar serviço'}
+                                                        className={`pc-switch ${isFrozen ? (construcao ? 'is-on-build' : 'is-on-maint') : ''}`}
                                                         onClick={(e) => {
-                                                            if (isEffectivelyFrozen) {
-                                                                e.preventDefault();
-                                                                alert('Este acesso está temporariamente indisponível. Em manutenção.');
-                                                                return;
-                                                            }
-                                                            if (!isDisabledForUser) {
-                                                                updateStatistics('bannerClick', {
-                                                                    bannerLabel: s.label || banner.label,
-                                                                    user: currentUser ? currentUser.username : 'Visitante'
-                                                                });
-                                                                setCurrentView('search');
-                                                            }
+                                                            e.preventDefault();
+                                                            e.stopPropagation();
+                                                            if (isFrozen) handleFreezeToggleGlobal(banner);
+                                                            else setFreezeModalBanner(banner);
                                                         }}
-                                                        disabled={isDisabledForUser}
-                                                        className={cardClass}
-                                                        style={cardStyle}
-                                                        {...dragProps}
-                                                    >
-                                                        {content}
+                                                    />
+                                                    <span title="Arraste para reordenar" style={{ color: 'var(--pc-muted)', display: 'inline-flex' }}>
+                                                        <PcIcon name="grip" size={16} />
+                                                    </span>
+                                                </div>
+                                            ) : (s.comingSoon && !isFrozen && (
+                                                <span className="pc-badge pc-badge--warn">Em construção</span>
+                                            ))}
+                                        </div>
+
+                                        <div className="pc-card-body">
+                                            <h3 className="pc-card-title">{action}</h3>
+                                            <p className="pc-card-desc">{s.description}</p>
+                                        </div>
+
+                                        <div className={`pc-card-foot ${isGroup ? 'is-group' : ''}`}>
+                                            {isGroup ? (
+                                                <>
+                                                    {subItems.length} {unidade(banner)}
+                                                    <PcIcon name="chevron" size={18} className="pc-chev" />
+                                                </>
+                                            ) : (
+                                                <>
+                                                    {s.isInternal ? 'Ferramenta interna' : 'Abre em nova aba'}
+                                                    {!isInert && <PcIcon name="arrowOut" size={16} />}
+                                                </>
+                                            )}
+                                        </div>
+
+                                        {isFrozen && !isAdmin && (
+                                            <div className="pc-veil">
+                                                <span className={`pc-badge ${construcao ? 'pc-badge--warn' : 'pc-badge--crit'}`}>
+                                                    {construcao ? 'Em construção' : 'Em manutenção'}
+                                                </span>
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            };
+
+                            const renderPanel = (banner) => {
+                                const s = BANNER_STATIC[banner.key];
+                                const items = subItemsFor(banner, s);
+                                return (
+                                    <div className="pc-panel" id={`grupo-${banner.key}`} style={{ '--accent': mosaicAccent(s.accent, darkMode) }}>
+                                        <div className="pc-panel-head">
+                                            <div>
+                                                <h3 className="pc-panel-title">{s.label || banner.label}</h3>
+                                                <p className="pc-panel-sub">{items.length} {unidade(banner)} disponíveis</p>
+                                            </div>
+                                            <button type="button" className="pc-btn pc-btn--sm" onClick={() => setOpenGroup(null)}>Recolher</button>
+                                        </div>
+                                        <div className="pc-subgrid">
+                                            {items.map(item => {
+                                                const inner = (
+                                                    <>
+                                                        {tile(item, 18)}
+                                                        <span className="pc-sub-text">
+                                                            <span className="pc-sub-title">{item.label}</span>
+                                                            {item.desc && <span className="pc-sub-desc">{item.desc}</span>}
+                                                        </span>
+                                                        <span className="pc-sub-tag">{item.tag}</span>
+                                                    </>
+                                                );
+                                                return item.href ? (
+                                                    <a key={item.id} href={item.href} target="_blank" rel="noopener noreferrer" className="pc-sub" onClick={() => track(item.label)}>
+                                                        {inner}
+                                                    </a>
+                                                ) : (
+                                                    <button key={item.id} type="button" className="pc-sub" onClick={() => { track(item.label); item.onSelect(); }}>
+                                                        {inner}
                                                     </button>
                                                 );
-                                            }
-                                            return (
-                                                <a
-                                                    key={banner.id}
-                                                    href={(isDisabledForUser || s.comingSoon || isEffectivelyFrozen) ? undefined : s.href}
-                                                    target={(isDisabledForUser || s.comingSoon || isEffectivelyFrozen) ? undefined : '_blank'}
-                                                    rel="noopener noreferrer"
-                                                    className={cardClass}
-                                                    style={cardStyle}
-                                                    onClick={(e) => {
-                                                        if (isEffectivelyFrozen) {
-                                                            e.preventDefault();
-                                                            alert('Este acesso está temporariamente indisponível. Em manutenção.');
-                                                        } else if (isDisabledForUser || s.comingSoon) {
-                                                            e.preventDefault();
-                                                        } else {
-                                                            updateStatistics('bannerClick', {
-                                                                bannerLabel: s.label || banner.label,
-                                                                user: currentUser ? currentUser.username : 'Visitante'
-                                                            });
-                                                        }
-                                                    }}
-                                                    {...dragProps}
-                                                >
-                                                    {content}
-                                                </a>
-                                            );
-                                        })}
+                                            })}
+                                        </div>
+                                    </div>
+                                );
+                            };
+
+                            const secoes = [...HOME_SECTIONS, { id: 'outros', title: 'Outros serviços', keys: null }]
+                                .map(sec => ({
+                                    ...sec,
+                                    banners: homeBanners.filter(b => sec.keys
+                                        ? sec.keys.includes(b.key)
+                                        : !HOME_SECTIONS.some(x => x.keys.includes(b.key)))
+                                }))
+                                .filter(sec => sec.banners.length > 0);
+
+                            return (
+                                <div className="flex flex-col gap-8 animate-fadeInUp">
+                                    {secoes.map(sec => {
+                                        const aberto = sec.banners.find(b => b.key === openGroup);
+                                        return (
+                                            <section key={sec.id} className="pc-section" aria-labelledby={`secao-${sec.id}`}>
+                                                <div className="pc-section-head">
+                                                    <h2 id={`secao-${sec.id}`} className="pc-section-title">{sec.title}</h2>
+                                                    <span className="pc-section-count">{sec.banners.length} {sec.banners.length === 1 ? 'módulo' : 'módulos'}</span>
+                                                </div>
+                                                <div className="pc-grid">
+                                                    {sec.banners.map((banner, i) => renderCard(banner, i))}
+                                                    {aberto && renderPanel(aberto)}
+                                                </div>
+                                            </section>
+                                        );
+                                    })}
                                 </div>
-                            </div>
                             );
                         })()}
 
@@ -4797,52 +4808,18 @@ function App() {
                         )}
 
                         {currentView === 'search' && (
-                            <div className={`${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} rounded-2xl shadow-2xl border backdrop-blur-sm p-8 mb-8 animate-fadeInUp`} style={{ animationDelay: '0.2s' }}>
-                                <div className="mb-8 text-center">
-                                    <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
-                                        Use a busca geral para encontrar por código do item, descrição do serviço, CNAE e descrição CNAE.
-                                    </p>
-                                </div>
-
-                                <div
-                                    onKeyDown={handleSearchKeyDown}
-                                    className="mb-6 transition-all duration-500"
-                                >
-                                    <div className="space-y-2">
-                                        <label className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                                            Pesquisa Geral
-                                        </label>
-                                        <div className="relative">
-                                            <input
-                                                type="text"
-                                                value={searchTerm}
-                                                onChange={(e) => setSearchTerm(e.target.value)}
-                                                placeholder="Digite qualquer termo para buscar em todos os campos..."
-                                                className={`w-full pl-4 pr-4 py-3 rounded-lg border transition-all duration-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent ${darkMode ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'}`}
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="flex justify-center">
-                                    <button
-                                        onClick={handleSearch}
-                                        disabled={isLoading}
-                                        className={`px-8 py-4 rounded-xl font-semibold text-white transition-all duration-300 transform hover:scale-105 focus:outline-none focus:ring-4 focus:ring-green-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-3 ${isLoading ? 'bg-gray-500' : 'bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-700 hover:to-blue-700 shadow-lg hover:shadow-xl'}`}
-                                    >
-                                        {isLoading ? (
-                                            <>
-                                                <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
-                                                Pesquisando...
-                                            </>
-                                        ) : (
-                                            <>
-                                                Realizar Consulta
-                                            </>
-                                        )}
-                                    </button>
-                                </div>
-                            </div>
+                            <ConsultaIssCnae
+                                data={data}
+                                searchTerm={searchTerm}
+                                setSearchTerm={setSearchTerm}
+                                mode={searchMode}
+                                setMode={setSearchMode}
+                                results={searchResults}
+                                lastQuery={lastQuery}
+                                onSearch={handleSearch}
+                                recent={recentSearches}
+                                getIncidence={getISSIncidenceLocation}
+                            />
                         )}
 
                         {/* View Admin: Gestão de Usuários */}
@@ -5078,6 +5055,23 @@ function App() {
                                         </button>
                                     </div>
                                 </header>
+
+                                {pendingUsers.length > 0 && (
+                                    <section className="pc-pending" aria-label="Solicitações pendentes">
+                                        <span className="pc-pending-ico"><PcIcon name="userPlus" /></span>
+                                        <div className="pc-pending-text">
+                                            <strong>
+                                                {pendingUsers.length === 1
+                                                    ? '1 solicitação de acesso aguardando aprovação'
+                                                    : `${pendingUsers.length} solicitações de acesso aguardando aprovação`}
+                                            </strong>
+                                            <span>{pendingUsers.slice(0, 3).map(u => u.username).join(', ')}{pendingUsers.length > 3 ? ' e outros' : ''}</span>
+                                        </div>
+                                        <button type="button" className="pc-btn pc-btn--ink" onClick={() => setCurrentView('admin-users')}>
+                                            Revisar solicitações
+                                        </button>
+                                    </section>
+                                )}
 
                                 {/* Barra de filtros — uma só, acima de tudo que ela escopa */}
                                 <div className="viz-filters">
@@ -5509,187 +5503,8 @@ function App() {
                             );
                         })()}
 
-                        {isLoading && (
-                            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                                <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} p-8 rounded-2xl shadow-2xl flex flex-col items-center`}>
-                                    <div className="relative mb-4">
-                                        <div className="animate-spin rounded-full h-16 w-16 border-4 border-blue-200 border-t-blue-600"></div>
-                                        <div className="absolute inset-0 animate-ping rounded-full h-16 w-16 border-2 border-blue-400"></div>
-                                    </div>
-                                    <p className={`text-lg font-medium ${darkMode ? 'text-white' : 'text-gray-800'}`}>Processando consulta...</p>
-                                    <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'} mt-2`}>Aguarde um momento</p>
-                                </div>
-                            </div>
-                        )}
-
-                        {isModalOpen && (
-                            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                                <div
-                                    className="absolute inset-0 backdrop-blur-sm"
-                                    onClick={closeModal}
-                                ></div>
-
-                                <div className={`relative w-full max-w-7xl max-h-[90vh] rounded-2xl shadow-2xl overflow-hidden ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
-                                    <div className="px-6 py-4 border-b flex justify-between items-center bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 text-white">
-                                        <h2 className="text-xl font-semibold flex items-center">
-                                            <svg className="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                                            </svg>
-                                            Resultados da Consulta
-                                        </h2>
-                                        <div className="flex gap-3 items-center">
-                                            <span className="text-sm bg-white bg-opacity-20 backdrop-filter backdrop-blur-sm px-4 py-2 rounded-full flex items-center gap-2">
-                                                <div className="status-indicator status-active"></div>
-                                                {modalResults.length} resultados
-                                            </span>
-                                            <button
-                                                onClick={closeModal}
-                                                className="p-2 hover:bg-white hover:bg-opacity-20 rounded-full transition-all duration-200"
-                                            >
-                                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                                </svg>
-                                            </button>
-                                        </div>
-                                    </div>
-
-                                    {noResults ? (
-                                        <div className="text-center py-16 animate-fadeInUp">
-                                            <svg className="mx-auto h-16 w-16 text-gray-400 mb-4 animate-pulse-custom" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.172 16.172a4 4 0 015.656 0M9 12h6m-6-4h6m2 5.291A7.962 7.962 0 0112 15c-2.34 0-4.47-.881-6.08-2.33" />
-                                            </svg>
-                                            <h3 className={`text-lg font-medium ${darkMode ? 'text-gray-300' : 'text-gray-900'} mb-2`}>
-                                                Nenhum resultado encontrado
-                                            </h3>
-                                            <p className={`${darkMode ? 'text-gray-400' : 'text-gray-500'} mb-4`}>
-                                                Tente ajustar o termo de pesquisa ou usar filtros diferentes.
-                                            </p>
-                                        </div>
-                                    ) : (
-                                        <div className="animate-fadeInUp">
-                                            <div className="overflow-x-auto custom-scrollbar px-6" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
-                                                <table className={`min-w-full ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
-                                                    <thead className={`sticky top-0 ${darkMode ? 'bg-gray-700' : 'bg-gray-50'} z-10`}>
-                                                        <tr>
-                                                            <th className={`px-4 py-3 text-center text-xs font-medium uppercase tracking-wider ${darkMode ? 'text-gray-300 border-gray-600' : 'text-gray-500 border-gray-200'
-                                                                } border-b`}>
-                                                                Código do Item
-                                                            </th>
-                                                            <th className={`px-4 py-3 text-center text-xs font-medium uppercase tracking-wider ${darkMode ? 'text-gray-300 border-gray-600' : 'text-gray-500 border-gray-200'
-                                                                } border-b`}>
-                                                                Descrição do Serviço
-                                                            </th>
-                                                            <th className={`px-4 py-3 text-center text-xs font-medium uppercase tracking-wider ${darkMode ? 'text-gray-300 border-gray-600' : 'text-gray-500 border-gray-200'
-                                                                } border-b`}>
-                                                                CNAE
-                                                            </th>
-                                                            <th className={`px-4 py-3 text-center text-xs font-medium uppercase tracking-wider ${darkMode ? 'text-gray-300 border-gray-600' : 'text-gray-500 border-gray-200'
-                                                                } border-b`}>
-                                                                Descrição CNAE
-                                                            </th>
-                                                            <th className={`px-4 py-3 text-center text-xs font-medium uppercase tracking-wider ${darkMode ? 'text-gray-300 border-gray-600' : 'text-gray-500 border-gray-200'
-                                                                } border-b`}>
-                                                                Alíquota ISS
-                                                            </th>
-                                                            <th className={`px-4 py-3 text-center text-xs font-medium uppercase tracking-wider ${darkMode ? 'text-gray-300 border-gray-600' : 'text-gray-500 border-gray-200'
-                                                                } border-b`}>
-                                                                Local de Incidência (Art. 3º LC 116)
-                                                            </th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody className={`divide-y ${darkMode ? 'divide-gray-600' : 'divide-gray-200'}`}>
-                                                        {modalResults.slice(0, 100).map((item, index) => (
-                                                            <tr key={index} className={`hover:${darkMode ? 'bg-gray-700' : 'bg-gray-50'} transition-all duration-300 hover:scale-[1.02]`}>
-                                                                <td className={`px-4 py-4 whitespace-nowrap text-sm text-center ${darkMode ? 'text-blue-300' : 'text-blue-600'
-                                                                    } font-medium`}>
-                                                                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${darkMode ? 'bg-blue-900 text-blue-200' : 'bg-blue-100 text-blue-800'
-                                                                        }`}>
-                                                                        {item["LIST LC"].replace(/^0+/, '') || item["LIST LC"]}
-                                                                    </span>
-                                                                </td>
-                                                                <td className={`px-4 py-4 text-sm text-center ${darkMode ? 'text-gray-300' : 'text-gray-900'
-                                                                    } max-w-xs`}>
-                                                                    <div className="line-clamp-3">
-                                                                        {item["Descrição item da lista da Lei Complementar nº 001/2003 - CTM"]}
-                                                                    </div>
-                                                                </td>
-                                                                <td className={`px-4 py-4 whitespace-nowrap text-sm text-center ${darkMode ? 'text-green-300' : 'text-green-600'
-                                                                    } font-medium`}>
-                                                                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${darkMode ? 'bg-green-900 text-green-200' : 'bg-green-100 text-green-800'
-                                                                        }`}>
-                                                                        {(() => {
-                                                                            const cnae = item["CNAE"].toString().replace(/[^0-9]/g, '');
-                                                                            if (cnae.length >= 7) {
-                                                                                const paddedCnae = cnae.padStart(7, '0');
-                                                                                return `${paddedCnae.slice(0, 4)}-${paddedCnae.slice(4, 5)}/${paddedCnae.slice(5, 7)}`;
-                                                                            }
-                                                                            return item["CNAE"];
-                                                                        })()}
-                                                                    </span>
-                                                                </td>
-                                                                <td className={`px-4 py-4 text-sm text-center ${darkMode ? 'text-gray-300' : 'text-gray-900'
-                                                                    } max-w-xs`}>
-                                                                    <div className="line-clamp-3">
-                                                                        {item["Descrição do CNAE"]}
-                                                                    </div>
-                                                                </td>
-                                                                <td className={`px-4 py-4 whitespace-nowrap text-sm text-center font-bold ${darkMode ? 'text-yellow-300' : 'text-yellow-600'
-                                                                    }`}>
-                                                                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold border-2 ${darkMode ? 'bg-yellow-900 text-yellow-200 border-yellow-600' : 'bg-yellow-100 text-yellow-800 border-yellow-400'
-                                                                        }`}>
-                                                                        {item["Alíquota"]}
-                                                                    </span>
-                                                                </td>
-                                                                <td className={`px-4 py-4 whitespace-nowrap text-sm text-center ${darkMode ? 'text-gray-300' : 'text-gray-900'
-                                                                    }`}>
-                                                                    {(() => {
-                                                                        const loc = getISSIncidenceLocation(item["LIST LC"]);
-                                                                        const isPrestador = loc.includes("Prestador");
-                                                                        return (
-                                                                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${isPrestador
-                                                                                    ? (darkMode ? 'bg-blue-900/30 text-blue-300 border-blue-800' : 'bg-blue-50 text-blue-800 border-blue-200')
-                                                                                    : (darkMode ? 'bg-emerald-900/40 text-emerald-300 border-emerald-800' : 'bg-emerald-50 text-emerald-800 border-emerald-200')
-                                                                                }`}>
-                                                                                {loc}
-                                                                            </span>
-                                                                        );
-                                                                    })()}
-                                                                </td>
-                                                            </tr>
-                                                        ))}
-                                                    </tbody>
-                                                </table>
-                                            </div>
-
-                                            <div className={`px-6 py-4 border-t ${darkMode ? 'border-gray-600 bg-gray-800' : 'border-gray-200 bg-gray-50'
-                                                } rounded-b-lg`}>
-                                                <div className="flex items-center justify-between">
-                                                    <div className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'
-                                                        }`}>
-                                                        <span className="font-medium">
-                                                            Mostrando {Math.min(100, modalResults.length)} de {modalResults.length} resultado{modalResults.length !== 1 ? 's' : ''}
-                                                        </span>
-                                                        {modalResults.length > 100 && (
-                                                            <span className={`ml-2 text-xs px-2 py-1 rounded-full ${darkMode ? 'bg-yellow-900 text-yellow-200' : 'bg-yellow-100 text-yellow-800'
-                                                                }`}>
-                                                                Primeiros 100 resultados
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                    <div className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-500'
-                                                        }`}>
-                                                        💡 Refine sua busca para resultados mais específicos
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        )}
-
-                        <footer className={`relative z-[1] mt-8 text-center text-xs font-semibold leading-tight transition-colors duration-500 select-none pointer-events-none whitespace-nowrap px-4 py-2 rounded-full backdrop-blur-sm ${darkMode ? 'text-gray-400 bg-gray-900/20' : 'text-gray-500 bg-white/20'}`}>
-                            <p>© 2026 Ecossistema DIAAF · <span className={`${darkMode ? 'text-blue-400' : 'text-blue-600'}`}>Murilo Miguel</span> 🚀</p>
+                        <footer className="pc-footer">
+                            © 2026 Ecossistema DIAAF · Murilo Miguel
                         </footer>
 
                     </div>
