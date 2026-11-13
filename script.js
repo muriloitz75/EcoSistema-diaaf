@@ -1846,6 +1846,7 @@ const PC_ICONS = {
     rotate: <><path d="M4 12a8 8 0 1 0 2.3-5.6L4 8.7" /><path d="M4 4v4.7h4.7" /></>,
     alert: <><circle cx="12" cy="12" r="9" /><path d="M12 8v4M12 16h.01" /></>,
     help: <><circle cx="12" cy="12" r="9" /><path d="M9.6 9.2a2.5 2.5 0 1 1 3.4 2.3c-.6.3-1 .8-1 1.5v.5M12 16.8h.01" /></>,
+    palette: <><path d="M12 3a9 9 0 1 0 0 18c1 0 1.7-.8 1.7-1.8 0-.5-.2-.9-.5-1.2-.3-.3-.5-.8-.5-1.2 0-1 .8-1.8 1.8-1.8H17a4 4 0 0 0 4-4c0-4.4-4-8-9-8z" /><circle cx="7.5" cy="11.5" r="1" /><circle cx="10" cy="7.5" r="1" /><circle cx="14.5" cy="7.5" r="1" /></>,
     chevronLeft: <path d="m15 6-6 6 6 6" />
 };
 
@@ -3117,6 +3118,89 @@ const SEARCH_MODES = [
 
 const LIMITE_LINHAS = 300;
 
+// ==================== APARÊNCIA: TEMA E COR DE DESTAQUE ====================
+// As cores ficam em painel-civico.css (html[data-accent] e html.dark[data-accent]),
+// cada uma com versão para o tema claro e para o escuro. 'azul' é o padrão institucional.
+const CORES_DESTAQUE = [
+    { id: 'azul', nome: 'Azul' },
+    { id: 'violeta', nome: 'Violeta' },
+    { id: 'magenta', nome: 'Magenta' },
+    { id: 'esmeralda', nome: 'Esmeralda' },
+    { id: 'ciano', nome: 'Ciano' },
+    { id: 'laranja', nome: 'Laranja' }
+];
+
+function AparenciaMenu({ darkMode, setDarkMode, corDestaque, setCorDestaque }) {
+    const [aberto, setAberto] = useState(false);
+    const raizRef = useRef(null);
+    const botaoRef = useRef(null);
+    const popRef = useRef(null);
+
+    useEffect(() => {
+        if (!aberto) return;
+        // Foco vai para a opção marcada; ESC ou clique fora fecham e devolvem o foco ao botão.
+        popRef.current?.querySelector('[aria-checked="true"], [aria-pressed="true"]')?.focus();
+        const fechar = (devolverFoco) => { setAberto(false); if (devolverFoco) botaoRef.current?.focus(); };
+        const onKey = (e) => { if (e.key === 'Escape') { e.preventDefault(); fechar(true); } };
+        const onClick = (e) => { if (raizRef.current && !raizRef.current.contains(e.target)) fechar(false); };
+        document.addEventListener('keydown', onKey);
+        document.addEventListener('mousedown', onClick);
+        return () => { document.removeEventListener('keydown', onKey); document.removeEventListener('mousedown', onClick); };
+    }, [aberto]);
+
+    // Setas movem entre as cores, como num grupo de opções.
+    const onSwatchKey = (e, i) => {
+        const passo = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key];
+        if (!passo) return;
+        e.preventDefault();
+        const prox = CORES_DESTAQUE[(i + passo + CORES_DESTAQUE.length) % CORES_DESTAQUE.length];
+        setCorDestaque(prox.id);
+        popRef.current?.querySelector(`[data-cor="${prox.id}"]`)?.focus();
+    };
+
+    return (
+        <div className="pc-aparencia" ref={raizRef}>
+            <button ref={botaoRef} type="button" className="pc-iconbtn" aria-label="Aparência: tema e cor de destaque"
+                aria-haspopup="dialog" aria-expanded={aberto} onClick={() => setAberto(v => !v)}>
+                <PcIcon name="palette" size={18} />
+                {!aberto && <span className="pc-tip">Aparência</span>}
+            </button>
+            {aberto && (
+                <div ref={popRef} className="pc-aparencia-pop" role="dialog" aria-label="Aparência">
+                    <p className="pc-aparencia-titulo">Aparência</p>
+                    <div className="pc-aparencia-grupo">
+                        <span className="pc-aparencia-rotulo" id="aparencia-tema">Tema</span>
+                        <div className="pc-seg" role="group" aria-labelledby="aparencia-tema">
+                            <button type="button" aria-pressed={!darkMode} onClick={() => setDarkMode(false)}>
+                                <PcIcon name="sun" size={16} /> Claro
+                            </button>
+                            <button type="button" aria-pressed={darkMode} onClick={() => setDarkMode(true)}>
+                                <PcIcon name="moon" size={16} /> Escuro
+                            </button>
+                        </div>
+                    </div>
+                    <div className="pc-aparencia-grupo">
+                        <span className="pc-aparencia-rotulo" id="aparencia-cor">Cor de destaque · tema {darkMode ? 'escuro' : 'claro'}</span>
+                        <div className="pc-swatches" role="radiogroup" aria-labelledby="aparencia-cor">
+                            {CORES_DESTAQUE.map((c, i) => {
+                                const marcada = corDestaque === c.id;
+                                return (
+                                    <button key={c.id} type="button" role="radio" aria-checked={marcada} tabIndex={marcada ? 0 : -1}
+                                        className="pc-swatch" data-cor={c.id} onClick={() => setCorDestaque(c.id)} onKeyDown={(e) => onSwatchKey(e, i)}>
+                                        <span className="pc-swatch-cor" aria-hidden="true">{marcada && <PcIcon name="check" size={12} strokeWidth={3} />}</span>
+                                        {c.nome}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+                    <p className="pc-aparencia-nota">Cada cor tem uma versão própria para o tema claro e para o escuro, com contraste adequado para leitura. A escolha fica salva neste navegador.</p>
+                </div>
+            )}
+        </div>
+    );
+}
+
 // ==================== GLOSSÁRIO DO SIMPLES NACIONAL ====================
 // Explica os selos e classificações da consulta em linguagem simples, com a base legal.
 // Textos conferidos na Res. CGSN nº 140/2018 vigente (arts. 8º, 15, 25 e 26).
@@ -4219,6 +4303,19 @@ function App() {
         }
     }, [darkMode]);
 
+    // Cor de destaque (ver CORES_DESTAQUE). O index.html já aplica a salva antes do
+    // React carregar, para a página não abrir piscando na cor padrão.
+    const [corDestaque, setCorDestaque] = useState(() => {
+        try {
+            const salva = localStorage.getItem('corDestaque');
+            return CORES_DESTAQUE.some(c => c.id === salva) ? salva : 'azul';
+        } catch (e) { return 'azul'; }
+    });
+    useEffect(() => {
+        document.documentElement.setAttribute('data-accent', corDestaque);
+        try { localStorage.setItem('corDestaque', corDestaque); } catch (e) { /* armazenamento indisponível */ }
+    }, [corDestaque]);
+
     // Rastrear 1 "Acesso" global por Sessão do Navegador (Visitantes ou Admins)
     useEffect(() => {
         const sessionTracked = sessionStorage.getItem('session_tracked_today');
@@ -4544,15 +4641,12 @@ function App() {
                                     <PcIcon name="mail" size={18} />
                                     <span className="pc-tip">E-mail Institucional</span>
                                 </a>
-                                <button
-                                    type="button"
-                                    onClick={() => setDarkMode(!darkMode)}
-                                    className="pc-iconbtn"
-                                    aria-label={darkMode ? 'Ativar modo claro' : 'Ativar modo escuro'}
-                                >
-                                    <PcIcon name={darkMode ? 'sun' : 'moon'} size={18} />
-                                    <span className="pc-tip">{darkMode ? 'Modo claro' : 'Modo escuro'}</span>
-                                </button>
+                                <AparenciaMenu
+                                    darkMode={darkMode}
+                                    setDarkMode={setDarkMode}
+                                    corDestaque={corDestaque}
+                                    setCorDestaque={setCorDestaque}
+                                />
                             </div>
                         </header>
 

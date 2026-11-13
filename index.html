@@ -4,6 +4,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script>
+        // Aplica tema (claro/escuro) e cor de destaque salvos antes de desenhar a página,
+        // para não abrir piscando no tema padrão. O App mantém isso atualizado depois.
+        try {
+            if (JSON.parse(localStorage.getItem('darkMode') || 'false')) document.documentElement.classList.add('dark');
+            var cor = localStorage.getItem('corDestaque');
+            if (cor) document.documentElement.setAttribute('data-accent', cor);
+        } catch (e) { /* armazenamento indisponível: fica o padrão */ }
+    </script>
     <meta name="description"
         content="Ecossistema DIAAF - Plataforma integrada de consulta fiscal, geração de pareceres e análise de processos.">
     <meta name="keywords" content="CNAE, LIST LC, ISS, consulta fiscal, alíquota, código fiscal, tributação">
@@ -49,7 +58,7 @@
     </script>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="./style.css?v=20261112a">
-    <link rel="stylesheet" href="./painel-civico.css?v=20261112d">
+    <link rel="stylesheet" href="./painel-civico.css?v=20261113a">
 
 </head>
 
