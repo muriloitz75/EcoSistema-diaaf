@@ -5,7 +5,7 @@
             "tools": [
                 {
                     "name": "fiscal_search",
-                    "description": "Busca códigos ISS e CNAE no banco de dados fiscal. Retorna item da LC, CNAE, descrições, alíquota e o local de incidência do ISS (art. 3º da LC 116/2003).",
+                    "description": "Busca códigos ISS e CNAE no banco de dados fiscal. Aceita descrição, item da LC (07.02), código de tributação nacional da NFS-e (07.02.01), NBS (1.0101.11.00, só no modo all) ou CNAE. Retorna item da LC, CNAE, descrições, alíquota, local de incidência do ISS (art. 3º da LC 116/2003), os códigos de tributação nacional do subitem, as NBS correlacionadas ao subitem e a atividade do Simples Nacional (Anexo III, IV, Fator R ou impeditiva). NBS e Simples por subitem vêm do Anexo VIII, preliminar: ver avisoNbs e avisoSimplesNacional. Também informa se o CNAE é impeditivo, ambíguo ou não impeditivo ao Simples (simplesNacionalCnae, Res. CGSN 140/2018, Anexos VI e VII, norma em vigor).",
                     "inputSchema": {
                         "type": "object",
                         "properties": {

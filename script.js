@@ -3116,7 +3116,7 @@ const SEARCH_MODES = [
 
 const LIMITE_LINHAS = 300;
 
-function ConsultaIssCnae({ data, searchTerm, setSearchTerm, mode, setMode, results, lastQuery, onSearch, recent, getIncidence }) {
+function ConsultaIssCnae({ data, listaNacional, searchTerm, setSearchTerm, mode, setMode, results, lastQuery, onSearch, recent, getIncidence }) {
     const [aliq, setAliq] = useState('all');
     const [selIndex, setSelIndex] = useState(0);
     const [copiado, setCopiado] = useState(false);
@@ -3139,6 +3139,45 @@ function ConsultaIssCnae({ data, searchTerm, setSearchTerm, mode, setMode, resul
         ? visiveis.filter(r => r['LIST LC'] === atual['LIST LC'] && r.__i !== atual.__i).slice(0, 6)
         : [];
 
+    // Códigos de tributação nacional da NFS-e (Anexo B) do subitem selecionado.
+    const desdobrosDe = (listLc) => window.BuscaFiscal.desdobramentos(listaNacional, listLc);
+    const codigosNacionais = atual ? desdobrosDe(atual['LIST LC']) : [];
+    const codigoBuscado = window.BuscaFiscal.codigoNacional(lastQuery);
+
+    // NBS correlacionadas ao subitem (Anexo VIII, preliminar). As que casam com a NBS buscada vêm primeiro.
+    const [nbsAberto, setNbsAberto] = useState(false);
+    useEffect(() => { setNbsAberto(false); }, [atual?.['LIST LC']]);
+    const nbsDe = (listLc) => window.BuscaFiscal.nbsDoSubitem(listaNacional, listLc);
+    const nbsBuscada = window.BuscaFiscal.codigoNbs(lastQuery);
+    const casaNbs = (n) => !!nbsBuscada && n.codigo.startsWith(nbsBuscada);
+    const nbsDoAtual = atual ? [...nbsDe(atual['LIST LC'])].sort((a, b) => casaNbs(b) - casaNbs(a)) : [];
+    const NBS_VISIVEIS = 6;
+
+    // Atividade do Simples Nacional (PGDAS-D) do subitem (Anexo VIII, preliminar).
+    const simplesDe = (listLc) => window.BuscaFiscal.simplesDoSubitem(listaNacional, listLc);
+    const simplesDoAtual = atual ? simplesDe(atual['LIST LC']) : [];
+    const rotuloSn = (cod) => listaNacional?.simplesNacional?.atividades?.[cod]?.rotulo || cod;
+
+    // Situação do CNAE no Simples pela Res. CGSN nº 140/2018 (Anexos VI e VII, norma em vigor).
+    const snCnae = (cnae) => window.BuscaFiscal.simplesDoCnae(listaNacional, cnae);
+    const SN_CNAE = {
+        impeditivo: { curto: 'Impeditivo SN', csv: 'Impeditivo (Anexo VI)', classe: 'pc-badge pc-badge--crit' },
+        ambiguo: { curto: 'Ambíguo SN', csv: 'Ambíguo (Anexo VII)', classe: 'pc-badge pc-badge--warn' },
+        'nao-impeditivo': { csv: 'Não impeditivo' }
+    };
+    const seloSnCnae = (cnae) => {
+        const s = snCnae(cnae);
+        const cfg = s && SN_CNAE[s.situacao];
+        if (!cfg?.curto) return null;
+        return (
+            <span className={cfg.classe} style={{ height: '1.125rem', fontSize: '.625rem', padding: '0 .375rem', alignSelf: 'flex-start', fontFamily: 'var(--pc-font)' }}
+                title={`Anexo ${s.anexo} da Res. CGSN nº 140/2018: ${s.denominacao}`}>
+                {cfg.curto}
+            </span>
+        );
+    };
+    const nbsMostradas = nbsAberto ? nbsDoAtual : nbsDoAtual.slice(0, NBS_VISIVEIS);
+
     const submit = (e) => {
         e.preventDefault();
         onSearch(searchTerm, mode);
@@ -3151,8 +3190,14 @@ function ConsultaIssCnae({ data, searchTerm, setSearchTerm, mode, setMode, resul
 
     const exportarCSV = () => {
         if (!visiveis.length) return;
-        const cab = ['Item LC', 'Descrição do item (CTM)', 'CNAE', 'Descrição do CNAE', 'Alíquota', 'Local de incidência'];
-        const rows = visiveis.map(r => [r['LIST LC'], r[CAMPO_ITEM_LC], formatCnae(r['CNAE']), r['Descrição do CNAE'], r['Alíquota'], getIncidence(r['LIST LC'])]);
+        const cab = ['Item LC', 'Descrição do item (CTM)', 'CNAE', 'Descrição do CNAE', 'Alíquota', 'Local de incidência', 'Código de tributação nacional (NFS-e)',
+            'NBS correlacionadas ao subitem (Anexo VIII, preliminar)', 'Simples Nacional (Anexo VIII, preliminar)',
+            'Simples Nacional - CNAE (Res. CGSN 140/2018)'];
+        const rows = visiveis.map(r => [r['LIST LC'], r[CAMPO_ITEM_LC], formatCnae(r['CNAE']), r['Descrição do CNAE'], r['Alíquota'], getIncidence(r['LIST LC']),
+            desdobrosDe(r['LIST LC']).map(c => c.codigo).join(' | '),
+            nbsDe(r['LIST LC']).map(n => n.codigo).join(' | '),
+            simplesDe(r['LIST LC']).map(a => a.rotulo).join(' | '),
+            SN_CNAE[snCnae(r['CNAE'])?.situacao]?.csv || '']);
         const csv = [cab, ...rows].map(l => l.map(v => '"' + String(v ?? '').replace(/"/g, '""') + '"').join(';')).join('\n');
         const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
         const url = URL.createObjectURL(blob);
@@ -3194,7 +3239,7 @@ function ConsultaIssCnae({ data, searchTerm, setSearchTerm, mode, setMode, resul
                             type="search"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            placeholder="Descrição, item da LC (ex.: 04.03) ou CNAE (ex.: 8640-2/02)"
+                            placeholder="Descrição, item LC (04.03), código nacional (07.02.01), NBS (1.0101.11.00) ou CNAE"
                             autoComplete="off"
                             autoFocus
                         />
@@ -3274,18 +3319,36 @@ function ConsultaIssCnae({ data, searchTerm, setSearchTerm, mode, setMode, resul
                                             >
                                                 <span className="pc-q-code">{r['LIST LC']}</span>
                                                 <span className="pc-q-txt pc-clip" title={r[CAMPO_ITEM_LC]}>{r[CAMPO_ITEM_LC]}</span>
-                                                <span className="pc-q-cnae">{formatCnae(r['CNAE'])}</span>
+                                                <span className="pc-q-cnae" style={{ display: 'flex', flexDirection: 'column', gap: '.1875rem' }}>
+                                                    {formatCnae(r['CNAE'])}
+                                                    {seloSnCnae(r['CNAE'])}
+                                                </span>
                                                 <span className="pc-q-txt pc-q-txt--ink pc-clip" title={r['Descrição do CNAE']}>{r['Descrição do CNAE']}</span>
                                                 <span style={{ textAlign: 'right' }}><span className={alClass(r['Alíquota'])}>{r['Alíquota']}</span></span>
                                             </button>
                                         ))}
-                                        {visiveis.length === 0 && (
-                                            <div className="pc-empty">
-                                                <span className="pc-empty-ico"><PcIcon name="search" size={22} /></span>
-                                                <strong>Nenhuma correspondência</strong>
-                                                <span>Tente um termo mais curto, o número do item da LC ou o código CNAE.</span>
-                                            </div>
-                                        )}
+                                        {visiveis.length === 0 && (() => {
+                                            // Código nacional que existe na NFS-e, mas cujo subitem não está na base municipal.
+                                            const soNacional = codigoBuscado && (listaNacional?.codigos || []).find(c => c.codigo === codigoBuscado);
+                                            return (
+                                                <div className="pc-empty">
+                                                    <span className="pc-empty-ico"><PcIcon name="search" size={22} /></span>
+                                                    <strong>Nenhuma correspondência</strong>
+                                                    {soNacional ? (
+                                                        <span>
+                                                            O código {soNacional.codigo} existe na lista nacional da NFS-e ({soNacional.descricao}),
+                                                            mas o subitem {soNacional.subitem} não consta na Resolução SEFAZGO nº 01/2021, então não há CNAE nem alíquota municipal cadastrados.
+                                                        </span>
+                                                    ) : (
+                                                        <span>
+                                                            {window.BuscaFiscal.codigoNbs(lastQuery) && mode !== 'all'
+                                                                ? 'A busca por NBS funciona no modo "Tudo".'
+                                                                : 'Tente um termo mais curto, o número do item da LC, o código nacional, a NBS ou o código CNAE.'}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            );
+                                        })()}
                                     </div>
                                 </div>
                             </div>
@@ -3318,11 +3381,117 @@ function ConsultaIssCnae({ data, searchTerm, setSearchTerm, mode, setMode, resul
                                         </div>
                                         <span className="pc-mono" style={{ fontSize: '1.125rem', fontWeight: 600 }}>{formatCnae(atual['CNAE'])}</span>
                                         <span style={{ fontSize: '.875rem', lineHeight: 1.5, color: 'var(--pc-ink-2)' }}>{atual['Descrição do CNAE']}</span>
+                                        {(() => {
+                                            const s = snCnae(atual['CNAE']);
+                                            if (!s) return null;
+                                            const nota = { fontSize: '.75rem', lineHeight: 1.45, color: 'var(--pc-ink-2)' };
+                                            if (s.situacao === 'nao-impeditivo') {
+                                                return (
+                                                    <span style={{ ...nota, color: 'var(--pc-muted)' }}>
+                                                        Simples Nacional: CNAE não consta nos Anexos VI e VII da Res. CGSN nº 140/2018 (não impeditivo pela CNAE; as demais vedações do art. 17 da LC 123/2006 continuam valendo).
+                                                    </span>
+                                                );
+                                            }
+                                            return (
+                                                <div className="flex flex-col gap-1" style={{ borderTop: '1px solid var(--pc-line)', paddingTop: '.5rem' }}>
+                                                    <span className={SN_CNAE[s.situacao].classe} style={{ alignSelf: 'flex-start' }}>
+                                                        {s.situacao === 'impeditivo' ? 'Impeditivo ao Simples Nacional' : 'Ambíguo no Simples Nacional'}
+                                                    </span>
+                                                    <span style={nota}>
+                                                        {s.situacao === 'impeditivo'
+                                                            ? `Consta no Anexo VI da Res. CGSN nº 140/2018 (CNAEs impeditivos): "${s.denominacao}".`
+                                                            : `Consta no Anexo VII da Res. CGSN nº 140/2018: o código abrange atividade impeditiva e permitida ("${s.denominacao}"). A opção depende da atividade efetivamente exercida.`}
+                                                    </span>
+                                                </div>
+                                            );
+                                        })()}
                                     </div>
                                     <div className="flex flex-col gap-1">
                                         <span className="pc-eyebrow">Local de incidência (art. 3º LC 116)</span>
                                         <span style={{ fontSize: '.875rem', fontWeight: 500 }}>{getIncidence(atual['LIST LC'])}</span>
                                     </div>
+                                    <div className="flex flex-col gap-2">
+                                        <span className="pc-eyebrow">Código de tributação nacional (NFS-e)</span>
+                                        {codigosNacionais.length > 1 && (
+                                            <span style={{ fontSize: '.8125rem', lineHeight: 1.45, color: 'var(--pc-muted)' }}>
+                                                Na NFS-e Nacional este subitem tem {codigosNacionais.length} desdobramentos. Use o que corresponde ao serviço; a alíquota e os CNAEs são os do subitem {atual['LIST LC']}.
+                                            </span>
+                                        )}
+                                        {codigosNacionais.length ? codigosNacionais.map(c => {
+                                            const destaque = c.codigo === codigoBuscado;
+                                            return (
+                                                <div key={c.codigo} className="pc-detail-box" style={{ gap: '.25rem', padding: '.625rem .75rem', ...(destaque ? { borderColor: 'var(--pc-brand)' } : {}) }}>
+                                                    <span className="pc-mono" style={{ fontSize: '.875rem', fontWeight: 600, color: 'var(--pc-brand)' }}>
+                                                        {c.codigo}{destaque ? ' · buscado' : ''}
+                                                    </span>
+                                                    <span style={{ fontSize: '.8125rem', lineHeight: 1.5, color: 'var(--pc-ink-2)' }}>{c.descricao}</span>
+                                                </div>
+                                            );
+                                        }) : (
+                                            <span style={{ fontSize: '.8125rem', color: 'var(--pc-muted)' }}>
+                                                {listaNacional ? 'Subitem sem código na lista nacional.' : 'Lista nacional não carregada.'}
+                                            </span>
+                                        )}
+                                    </div>
+                                    {listaNacional?.simplesNacional && (
+                                        <div className="flex flex-col gap-2">
+                                            <span className="pc-eyebrow">Simples Nacional (PGDAS-D)</span>
+                                            {simplesDoAtual.length ? (
+                                                <>
+                                                    {simplesDoAtual.map(a => (
+                                                        <div key={a.codigo} className="pc-detail-box" style={{ gap: '.25rem', padding: '.625rem .75rem' }}>
+                                                            <span style={{ fontSize: '.875rem', fontWeight: 600, color: a.codigo === 'IMP' ? 'var(--pc-danger)' : 'var(--pc-ink)' }}>
+                                                                {a.rotulo}
+                                                            </span>
+                                                            <span style={{ fontSize: '.75rem', lineHeight: 1.45, color: 'var(--pc-ink-2)' }}>
+                                                                {a.descricao} <span className="pc-mono" style={{ color: 'var(--pc-muted)' }}>(atividade {a.codigo})</span>
+                                                            </span>
+                                                        </div>
+                                                    ))}
+                                                    {simplesDoAtual.length > 1 && (
+                                                        <span style={{ fontSize: '.75rem', lineHeight: 1.45, color: 'var(--pc-ink-2)' }}>
+                                                            Depende do serviço. Quando o Anexo VIII liga a classificação a uma NBS, ela aparece ao lado da NBS, abaixo.
+                                                        </span>
+                                                    )}
+                                                </>
+                                            ) : (
+                                                <span style={{ fontSize: '.8125rem', color: 'var(--pc-muted)' }}>Subitem sem classificação no Anexo VIII.</span>
+                                            )}
+                                            <span style={{ fontSize: '.75rem', lineHeight: 1.45, color: 'var(--pc-muted)' }} title={listaNacional.simplesNacional.aviso}>
+                                                Correlação preliminar do Anexo VIII (RFB). Confirme o enquadramento na LC 123/2006 e na Resolução CGSN nº 140/2018.
+                                            </span>
+                                        </div>
+                                    )}
+                                    {listaNacional?.nbs && (
+                                        <div className="flex flex-col gap-2">
+                                            <span className="pc-eyebrow">NBS correlacionadas ao subitem {atual['LIST LC']}</span>
+                                            <span style={{ fontSize: '.75rem', lineHeight: 1.45, color: 'var(--pc-muted)' }} title={listaNacional.nbs.aviso}>
+                                                Correlação preliminar do Anexo VIII (RFB), sem regra de negócio no emissor da NFS-e. Vale para todos os desdobramentos do subitem.
+                                            </span>
+                                            {nbsDoAtual.length ? (
+                                                <>
+                                                    {nbsMostradas.map(n => (
+                                                        <div key={n.codigo} className="flex items-baseline gap-2" style={casaNbs(n) ? { background: 'var(--pc-brand-soft)', borderRadius: '.375rem', padding: '.125rem .375rem', margin: '0 -.375rem' } : undefined}>
+                                                            <span className="pc-mono" style={{ fontSize: '.8125rem', color: 'var(--pc-brand)', flex: 'none' }}>{n.codigo}</span>
+                                                            <span style={{ fontSize: '.8125rem', lineHeight: 1.45, color: 'var(--pc-ink-2)' }}>
+                                                                {n.descricao}
+                                                                {simplesDoAtual.length > 1 && n.sn && (
+                                                                    <span className={`pc-badge${n.sn === 'IMP' ? ' pc-badge--crit' : ''}`} style={{ marginLeft: '.375rem', height: '1.25rem', fontSize: '.6875rem', verticalAlign: 'middle', ...(n.sn === 'IMP' ? {} : { background: 'var(--pc-brand-soft)', color: 'var(--pc-brand)' }) }}>{rotuloSn(n.sn)}</span>
+                                                                )}
+                                                            </span>
+                                                        </div>
+                                                    ))}
+                                                    {nbsDoAtual.length > NBS_VISIVEIS && (
+                                                        <button type="button" className="pc-btn pc-btn--sm" style={{ alignSelf: 'flex-start', minHeight: '2rem' }} onClick={() => setNbsAberto(v => !v)} aria-expanded={nbsAberto}>
+                                                            {nbsAberto ? 'Mostrar menos' : `Mostrar todas (${nbsDoAtual.length})`}
+                                                        </button>
+                                                    )}
+                                                </>
+                                            ) : (
+                                                <span style={{ fontSize: '.8125rem', color: 'var(--pc-muted)' }}>Nenhuma NBS correlacionada a este subitem no Anexo VIII.</span>
+                                            )}
+                                        </div>
+                                    )}
                                     <div className="flex flex-col gap-2">
                                         <h2 style={{ margin: 0, fontSize: '.875rem', fontWeight: 600 }}>Outros CNAEs do item {atual['LIST LC']} nesta busca</h2>
                                         {irmaos.length ? irmaos.map(r => (
@@ -3423,6 +3592,8 @@ function App() {
     const [sidebarMobileOpen, setSidebarMobileOpen] = useState(false);
 
     const [data, setData] = useState([]);
+    // Lista de Serviços Nacional da NFS-e (Anexo B), gerada por tools/importar_lista_nacional.py.
+    const [listaNacional, setListaNacional] = useState(null);
     const [filteredData, setFilteredData] = useState([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [searchMode, setSearchMode] = useState('all'); // all | text | lc | cnae
@@ -3866,6 +4037,12 @@ function App() {
             .catch(error => {
                 console.error('Erro ao carregar dados:', error);
             });
+
+        // Opcional: sem ela a consulta funciona, só não mostra os códigos nacionais.
+        fetch('lista-nacional.json')
+            .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+            .then(setListaNacional)
+            .catch(error => console.warn('Lista nacional da NFS-e indisponível:', error.message));
     }, []);
 
     // Local de incidência do ISS (art. 3º da LC 116/2003). A regra fica em incidencia-iss.js,
@@ -3875,7 +4052,7 @@ function App() {
 
     // Busca na base ISS / CNAE. As regras ficam em busca-fiscal.js, compartilhadas com a
     // API (/api/fiscal/search); o index.html carrega o arquivo antes deste.
-    const filterData = (term, mode = 'all') => window.BuscaFiscal.filtrar(data, term, mode);
+    const filterData = (term, mode = 'all') => window.BuscaFiscal.filtrar(data, term, mode, listaNacional);
 
     const handleSearch = (termo = searchTerm, mode = searchMode) => {
         const query = termo.trim();
@@ -4474,6 +4651,7 @@ function App() {
                         {currentView === 'search' && (
                             <ConsultaIssCnae
                                 data={data}
+                                listaNacional={listaNacional}
                                 searchTerm={searchTerm}
                                 setSearchTerm={setSearchTerm}
                                 mode={searchMode}

@@ -1316,31 +1316,47 @@ app.post('/api/audit/log', authenticateToken, requireDB, async (req, res) => {
 const BuscaFiscal = require('./busca-fiscal');
 const { localDeIncidencia } = require('./incidencia-iss');
 
-// Base ISS / CNAE: a mesma dados.json que a tela usa.
-// Fica em memória e é relida sozinha quando o arquivo muda (compara a data de
-// modificação a cada busca, o que é barato). Se a nova versão tiver JSON inválido,
-// continua servindo a última versão válida e registra o erro no log.
-const CAMINHO_BASE_FISCAL = require('path').join(__dirname, 'dados.json');
-let baseFiscal = null;
-let baseFiscalMtime = 0;
-const carregarBaseFiscal = () => {
-    const fsMod = require('fs');
-    const mtime = fsMod.statSync(CAMINHO_BASE_FISCAL).mtimeMs;
-    if (baseFiscal && mtime === baseFiscalMtime) return baseFiscal;
+// Lê um JSON da pasta do projeto e o mantém em memória, relendo sozinho quando o
+// arquivo muda (compara a data de modificação a cada chamada, o que é barato).
+// Se a nova versão for inválida, continua servindo a última válida e registra no log.
+// `validar` devolve a quantidade de registros (para o log) ou lança erro.
+const criarLeitorJson = (arquivo, validar) => {
+    const caminho = require('path').join(__dirname, arquivo);
+    let atual = null;
+    let mtimeAtual = 0;
+    return () => {
+        const fsMod = require('fs');
+        const mtime = fsMod.statSync(caminho).mtimeMs;
+        if (atual && mtime === mtimeAtual) return atual;
+        try {
+            const novo = JSON.parse(fsMod.readFileSync(caminho, 'utf8'));
+            const qtd = validar(novo);
+            const recarga = atual !== null;
+            atual = novo;
+            mtimeAtual = mtime;
+            console.log(`[Base fiscal] ${recarga ? 'Recarregada' : 'Carregada'}: ${qtd} registros de ${arquivo}`);
+        } catch (e) {
+            if (!atual) throw e;    // sem versão anterior válida, não há o que servir
+            mtimeAtual = mtime;     // não tenta reler a mesma versão inválida a cada chamada
+            console.error(`[Base fiscal] ${arquivo} inválido (${e.message}); mantendo a versão anterior`);
+        }
+        return atual;
+    };
+};
 
-    try {
-        const nova = JSON.parse(fsMod.readFileSync(CAMINHO_BASE_FISCAL, 'utf8'));
-        if (!Array.isArray(nova)) throw new Error('o conteúdo não é uma lista');
-        const recarga = baseFiscal !== null;
-        baseFiscal = nova;
-        baseFiscalMtime = mtime;
-        console.log(`[Base fiscal] ${recarga ? 'Recarregada' : 'Carregada'}: ${nova.length} linhas de dados.json`);
-    } catch (e) {
-        if (!baseFiscal) throw e; // sem versão anterior válida, não há o que servir
-        baseFiscalMtime = mtime;  // não tenta reler a mesma versão inválida a cada busca
-        console.error(`[Base fiscal] dados.json inválido (${e.message}); mantendo a versão anterior com ${baseFiscal.length} linhas`);
-    }
-    return baseFiscal;
+// Base ISS / CNAE (Resolução SEFAZGO nº 01/2021): a mesma dados.json que a tela usa.
+const carregarBaseFiscal = criarLeitorJson('dados.json', (d) => {
+    if (!Array.isArray(d)) throw new Error('o conteúdo não é uma lista');
+    return d.length;
+});
+// Lista de Serviços Nacional da NFS-e (Anexo B), gerada por tools/importar_lista_nacional.py.
+const carregarListaNacional = criarLeitorJson('lista-nacional.json', (d) => {
+    if (!d || !Array.isArray(d.codigos)) throw new Error('sem a lista "codigos"');
+    return d.codigos.length;
+});
+// A lista nacional é complementar: se faltar, a busca continua funcionando sem ela.
+const listaNacionalOuVazia = () => {
+    try { return carregarListaNacional(); } catch (e) { console.error('[Base fiscal] lista-nacional.json indisponível:', e.message); return null; }
 };
 
 // Busca de itens ISS / CNAE (usada pela ferramenta MCP fiscal_search)
@@ -1353,20 +1369,38 @@ app.get('/api/fiscal/search', authenticateToken, (req, res) => {
         const mode = BuscaFiscal.MODOS.includes(req.query.mode) ? req.query.mode : 'all';
         const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 10, 1), 100);
 
-        const encontrados = BuscaFiscal.filtrar(carregarBaseFiscal(), query, mode);
+        const listaNacional = listaNacionalOuVazia();
+        const encontrados = BuscaFiscal.filtrar(carregarBaseFiscal(), query, mode, listaNacional);
         const C = BuscaFiscal.CAMPOS;
+        const codBuscado = BuscaFiscal.codigoNacional(query);
+        const codigoNacionalBuscado = codBuscado && listaNacional && listaNacional.codigos.some(c => c.codigo === codBuscado)
+            ? codBuscado : null;
 
         res.json({
             query,
             mode,
             total: encontrados.length,
+            // Preenchido quando a busca foi por um código de tributação nacional (ex.: 07.02.01)
+            codigoNacionalBuscado,
+            // NBS por subitem vêm do Anexo VIII, que a própria RFB marca como preliminar
+            avisoNbs: listaNacional?.nbs?.aviso || null,
+            avisoSimplesNacional: listaNacional?.simplesNacional?.aviso || null,
             results: encontrados.slice(0, limit).map(l => ({
                 itemLc: l[C.itemLc],
                 descricaoItemLc: l[C.descricaoItemLc],
                 cnae: l[C.cnae],
                 descricaoCnae: l[C.descricaoCnae],
                 aliquota: l[C.aliquota],
-                localIncidencia: localDeIncidencia(l[C.itemLc])
+                localIncidencia: localDeIncidencia(l[C.itemLc]),
+                // Desdobramentos do subitem na NFS-e Nacional (alíquota e CNAE são os do subitem)
+                codigosNacionais: BuscaFiscal.desdobramentos(listaNacional, l[C.itemLc])
+                    .map(c => ({ codigo: c.codigo, descricao: c.descricao })),
+                // NBS correlacionadas ao subitem (preliminar; ver avisoNbs). `sn` = atividade do Simples da NBS
+                nbs: BuscaFiscal.nbsDoSubitem(listaNacional, l[C.itemLc]),
+                // Atividade(s) do Simples Nacional do subitem (preliminar; ver avisoSimplesNacional)
+                simplesNacional: BuscaFiscal.simplesDoSubitem(listaNacional, l[C.itemLc]),
+                // Situação do CNAE no Simples pela Res. CGSN nº 140/2018, Anexos VI e VII (norma em vigor)
+                simplesNacionalCnae: BuscaFiscal.simplesDoCnae(listaNacional, l[C.cnae])
             }))
         });
     } catch (error) {
