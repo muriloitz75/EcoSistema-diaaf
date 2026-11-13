@@ -1159,6 +1159,61 @@ html.dark .pc-sheet-head > .pc-tile:not(.pc-tile--img) { color: #0B1018; }
     cursor: pointer;
 }
 .pc-seg button[aria-pressed="true"] { background: var(--pc-surface); color: var(--pc-ink); box-shadow: 0 1px 2px rgba(13, 21, 36, .14); }
+/* Contagem de resultados em cada pílula, após uma busca; pílula sem resultado fica esmaecida */
+.pc-seg { flex-wrap: wrap; max-width: 100%; }
+.pc-seg-n { margin-left: .375rem; font-family: var(--pc-mono); font-size: .75rem; font-weight: 600; }
+.pc-seg button.is-vazio:not([aria-pressed="true"]) { opacity: .6; }
+@media (max-width: 480px) { .pc-seg button { padding: 0 .625rem; } }
+
+/* Botão "O que significa?" e glossário do Simples Nacional */
+.pc-ajuda-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: .25rem;
+    padding: .125rem .25rem;
+    margin: 0 -.25rem;
+    border: 0;
+    border-radius: .375rem;
+    background: transparent;
+    color: var(--pc-brand);
+    font: inherit;
+    font-size: .75rem;
+    font-weight: 600;
+    cursor: pointer;
+    vertical-align: middle;
+    align-self: flex-start;
+}
+.pc-ajuda-btn:hover { text-decoration: underline; }
+.pc-ajuda-btn:focus-visible { outline: 2px solid var(--pc-focus); outline-offset: 1px; }
+.pc-glossario-ico {
+    flex: none;
+    display: inline-grid;
+    place-items: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: .75rem;
+    background: var(--pc-brand-soft);
+    color: var(--pc-brand);
+}
+.pc-glossario-grupo { display: flex; flex-direction: column; gap: .625rem; padding-top: 1rem; scroll-margin-top: .25rem; }
+.pc-glossario-grupo:first-child { padding-top: 0; }
+.pc-glossario-grupo h3 { margin: 0; font-size: 1rem; font-weight: 600; }
+.pc-glossario-fonte { margin: 0; font-size: .8125rem; line-height: 1.5; color: var(--pc-muted); }
+.pc-glossario-item {
+    display: flex;
+    flex-direction: column;
+    gap: .375rem;
+    padding: .75rem .875rem;
+    border: 1px solid var(--pc-line);
+    border-radius: .75rem;
+    scroll-margin-top: .25rem;
+}
+.pc-glossario-item.is-foco { border-color: var(--pc-brand); box-shadow: 0 0 0 3px var(--pc-brand-soft); }
+.pc-glossario-item p, .pc-glossario-nota p { margin: 0; font-size: .875rem; line-height: 1.55; color: var(--pc-ink-2); }
+.pc-glossario-item p strong, .pc-glossario-nota p strong { color: var(--pc-ink); }
+.pc-glossario-item .pc-glossario-base { font-size: .75rem; color: var(--pc-muted); }
+.pc-glossario-semselo { font-size: .8125rem; color: var(--pc-ink); }
+.pc-glossario-nota { display: flex; flex-direction: column; gap: .5rem; padding: .875rem 1rem; border-radius: .75rem; background: var(--pc-surface-2); }
 .pc-recent { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; font-size: .8125rem; }
 .pc-recent-btn {
     min-height: 2rem;

@@ -1845,6 +1845,7 @@ const PC_ICONS = {
     sliders: <><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12" /><circle cx="16" cy="6" r="2" /><circle cx="10" cy="12" r="2" /><circle cx="18" cy="18" r="2" /></>,
     rotate: <><path d="M4 12a8 8 0 1 0 2.3-5.6L4 8.7" /><path d="M4 4v4.7h4.7" /></>,
     alert: <><circle cx="12" cy="12" r="9" /><path d="M12 8v4M12 16h.01" /></>,
+    help: <><circle cx="12" cy="12" r="9" /><path d="M9.6 9.2a2.5 2.5 0 1 1 3.4 2.3c-.6.3-1 .8-1 1.5v.5M12 16.8h.01" /></>,
     chevronLeft: <path d="m15 6-6 6 6 6" />
 };
 
@@ -3116,9 +3117,179 @@ const SEARCH_MODES = [
 
 const LIMITE_LINHAS = 300;
 
+// ==================== GLOSSÁRIO DO SIMPLES NACIONAL ====================
+// Explica os selos e classificações da consulta em linguagem simples, com a base legal.
+// Textos conferidos na Res. CGSN nº 140/2018 vigente (arts. 8º, 15, 25 e 26).
+
+const GLOSSARIO_SIMPLES = [
+    {
+        id: 'cnae',
+        titulo: 'Situação do CNAE no Simples Nacional',
+        fonte: 'Norma oficial em vigor: Resolução CGSN nº 140/2018, art. 8º e Anexos VI e VII.',
+        onde: 'Aparece embaixo do código na tabela e no quadro do CNAE, no painel ao lado.',
+        itens: [
+            {
+                id: 'impeditivo', selo: 'Impeditivo SN', classe: 'pc-badge pc-badge--crit',
+                significa: 'A atividade deste CNAE impede a empresa de optar pelo Simples Nacional. O código está na lista de CNAEs impeditivos (Anexo VI).',
+                pratica: 'Empresa com este CNAE no CNPJ não pode ser optante do Simples. Se ela aparecer como optante, há indício de enquadramento indevido, a ser verificado. Fora do Simples, o ISS segue a alíquota municipal mostrada nesta consulta.',
+                base: 'Res. CGSN nº 140/2018, art. 8º, § 1º, e Anexo VI.'
+            },
+            {
+                id: 'ambiguo', selo: 'Ambíguo SN', classe: 'pc-badge pc-badge--warn',
+                significa: 'O mesmo código CNAE abrange atividades que impedem e atividades que permitem o Simples. O código, sozinho, não resolve: depende do que a empresa realmente faz.',
+                pratica: 'A empresa pode optar desde que exerça apenas a parte permitida e declare expressamente que não se enquadra nas vedações. Confira a atividade efetivamente exercida: objeto social, notas emitidas e contratos.',
+                base: 'Res. CGSN nº 140/2018, art. 8º, §§ 2º e 3º, e Anexo VII.'
+            },
+            {
+                id: 'nao-impeditivo', selo: null,
+                significa: 'O CNAE não está nem no Anexo VI nem no Anexo VII. A atividade, por si, não impede o Simples. Por isso a linha não tem selo.',
+                pratica: 'A opção ainda pode ser vedada por outros motivos, como faturamento, composição societária ou débitos. Esta consulta não verifica esses pontos.',
+                base: 'Res. CGSN nº 140/2018, art. 15 (demais vedações).'
+            }
+        ]
+    },
+    {
+        id: 'subitem',
+        titulo: 'Anexo de tributação do serviço (por subitem)',
+        fonte: 'Referência preliminar: Anexo VIII da NFS-e (RFB), sem regra de negócio no emissor. As regras dos anexos estão nos arts. 25 e 26 da Res. CGSN nº 140/2018.',
+        onde: 'Aparece na seção "Simples Nacional (PGDAS-D)" do painel e nas etiquetas das NBS. O número entre parênteses (7, 9, 13…) é o código de atividade do PGDAS-D usado pelo Anexo VIII.',
+        itens: [
+            {
+                id: 'anexo-iii', selo: 'Anexo III', classe: 'pc-badge', estilo: { background: 'var(--pc-brand-soft)', color: 'var(--pc-brand)' },
+                significa: 'Para a empresa do Simples, a receita deste serviço é tributada pela tabela do Anexo III.',
+                pratica: 'Abrange, entre outros, ensino, agência de viagens e transporte municipal. É a tabela do anexo que define a alíquota cobrada no DAS.',
+                base: 'Res. CGSN nº 140/2018, art. 25, § 1º, III.'
+            },
+            {
+                id: 'anexo-iv', selo: 'Anexo IV', classe: 'pc-badge', estilo: { background: 'var(--pc-brand-soft)', color: 'var(--pc-brand)' },
+                significa: 'A receita é tributada pela tabela do Anexo IV: construção de imóveis e obras de engenharia, vigilância, limpeza ou conservação, e serviços advocatícios.',
+                pratica: 'Neste anexo, a contribuição previdenciária patronal (CPP) não está no DAS e é recolhida à parte.',
+                base: 'Res. CGSN nº 140/2018, art. 25, § 1º, IV; LC nº 123/2006, art. 18, § 5º-C.'
+            },
+            {
+                id: 'fator-r', selo: 'Anexo III ou V (Fator R)', classe: 'pc-badge', estilo: { background: 'var(--pc-brand-soft)', color: 'var(--pc-brand)' },
+                significa: 'O anexo depende do fator "r": a folha de salários com encargos dos últimos 12 meses dividida pela receita bruta dos últimos 12 meses.',
+                pratica: 'Fator "r" igual ou maior que 0,28 (28%): Anexo III. Menor que 0,28: Anexo V. Como depende da folha da empresa, pode mudar de um mês para outro.',
+                base: 'Res. CGSN nº 140/2018, art. 25, § 1º, V, e art. 26.'
+            },
+            {
+                id: 'impeditiva-subitem', selo: 'Impeditiva ao Simples', classe: 'pc-badge pc-badge--crit',
+                significa: 'O Anexo VIII marca o serviço deste subitem como atividade que não pode ser exercida no Simples.',
+                pratica: 'É uma referência preliminar. Para decidir, vale a situação do CNAE (Anexos VI e VII da Res. CGSN nº 140/2018), que é norma oficial.',
+                base: 'Anexo VIII da NFS-e (RFB), coluna da atividade do Simples Nacional.'
+            }
+        ]
+    }
+];
+
+// Classificação do Simples por subitem (código de atividade do Anexo VIII) → termo do glossário.
+const termoGlossarioSn = (atividade) => {
+    if (!atividade) return 'subitem';
+    if (atividade.codigo === 'IMP') return 'impeditiva-subitem';
+    if (/fator/i.test(atividade.rotulo)) return 'fator-r';
+    if (/anexo iv/i.test(atividade.rotulo)) return 'anexo-iv';
+    if (/anexo iii/i.test(atividade.rotulo)) return 'anexo-iii';
+    return 'subitem';
+};
+
+function AjudaSimples({ foco, onClose }) {
+    const sheetRef = useRef(null);
+    const fecharRef = useRef(null);
+    const tituloId = 'ajuda-simples-titulo';
+
+    useEffect(() => {
+        const anterior = document.activeElement;
+        fecharRef.current?.focus();
+        // Rola até o termo clicado (ou o grupo dele)
+        const alvo = foco && sheetRef.current?.querySelector(`[data-termo="${foco}"]`);
+        if (alvo) alvo.scrollIntoView({ block: 'start' });
+
+        const onKey = (e) => {
+            if (e.key === 'Escape') { e.preventDefault(); onClose(); return; }
+            if (e.key === 'Tab' && sheetRef.current) {
+                const focaveis = sheetRef.current.querySelectorAll('button, a[href], [tabindex="0"]');
+                if (!focaveis.length) return;
+                const primeiro = focaveis[0], ultimo = focaveis[focaveis.length - 1];
+                if (e.shiftKey && document.activeElement === primeiro) { e.preventDefault(); ultimo.focus(); }
+                else if (!e.shiftKey && document.activeElement === ultimo) { e.preventDefault(); primeiro.focus(); }
+            }
+        };
+        document.addEventListener('keydown', onKey);
+        return () => {
+            document.removeEventListener('keydown', onKey);
+            if (anterior && typeof anterior.focus === 'function') anterior.focus();
+        };
+    }, []);
+
+    return ReactDOM.createPortal(
+        <div className="pc-sheet-layer">
+            <div className="pc-sheet-backdrop" onClick={onClose} />
+            <div ref={sheetRef} className="pc-sheet" role="dialog" aria-modal="true" aria-labelledby={tituloId} style={{ '--accent': 'var(--pc-brand)' }}>
+                <div className="pc-sheet-head">
+                    <span className="pc-glossario-ico" aria-hidden="true"><PcIcon name="help" size={20} /></span>
+                    <div className="pc-sheet-heading">
+                        <h2 id={tituloId} className="pc-sheet-title">O que significam as situações do Simples Nacional</h2>
+                        <p className="pc-sheet-sub">Os selos e classificações que a consulta mostra, em linguagem simples, com a base legal.</p>
+                    </div>
+                    <button ref={fecharRef} type="button" className="pc-iconbtn pc-sheet-close" aria-label="Fechar" onClick={onClose}>
+                        <PcIcon name="close" size={18} />
+                    </button>
+                </div>
+                <div className="pc-sheet-scroll custom-scrollbar">
+                    {GLOSSARIO_SIMPLES.map(grupo => (
+                        <section key={grupo.id} className="pc-glossario-grupo" data-termo={grupo.id} aria-labelledby={`glossario-${grupo.id}`}>
+                            <h3 id={`glossario-${grupo.id}`}>{grupo.titulo}</h3>
+                            <p className="pc-glossario-fonte">{grupo.fonte} {grupo.onde}</p>
+                            {grupo.itens.map(item => (
+                                <article key={item.id} data-termo={item.id} className={`pc-glossario-item${item.id === foco ? ' is-foco' : ''}`}>
+                                    {item.selo
+                                        ? <span className={item.classe} style={{ alignSelf: 'flex-start', ...(item.estilo || {}) }}>{item.selo}</span>
+                                        : <strong className="pc-glossario-semselo">Sem selo (não impeditivo)</strong>}
+                                    <p><strong>O que significa.</strong> {item.significa}</p>
+                                    <p><strong>Na prática.</strong> {item.pratica}</p>
+                                    <p className="pc-glossario-base">Base: {item.base}</p>
+                                </article>
+                            ))}
+                        </section>
+                    ))}
+                    <section className="pc-glossario-grupo" data-termo="divergencia">
+                        <h3>E quando as duas classificações não batem?</h3>
+                        <div className="pc-glossario-nota">
+                            <p>
+                                <strong>Para saber se a empresa pode estar no Simples, vale a situação do CNAE.</strong> Ela é norma oficial.
+                                O anexo por subitem só indica qual tabela de alíquotas se aplica ao serviço, para quem já é do Simples.
+                            </p>
+                            <p>
+                                Exemplo: no subitem 15.01, o Anexo VIII indica "Fator R", mas os CNAEs de banco são impeditivos.
+                                Um banco não pode ser do Simples, e o anexo por subitem nem chega a valer para ele.
+                            </p>
+                            <p>
+                                Lembre também: em regra, a empresa do Simples paga o ISS dentro do DAS, pela tabela do anexo,
+                                e não pela alíquota municipal desta consulta.
+                            </p>
+                        </div>
+                    </section>
+                </div>
+            </div>
+        </div>,
+        document.body
+    );
+}
+
+// Botão "O que significa?" que abre o glossário no termo indicado.
+function BotaoAjuda({ termo, onAbrir, rotulo = 'O que significa?' }) {
+    return (
+        <button type="button" className="pc-ajuda-btn" onClick={() => onAbrir(termo)}>
+            <PcIcon name="help" size={14} />
+            {rotulo}
+        </button>
+    );
+}
+
 function ConsultaIssCnae({ data, listaNacional, searchTerm, setSearchTerm, mode, setMode, results, lastQuery, onSearch, recent, getIncidence }) {
     const [aliq, setAliq] = useState('all');
     const [selIndex, setSelIndex] = useState(0);
+    const [ajuda, setAjuda] = useState(null); // termo do glossário do Simples aberto, ou null
     const [copiado, setCopiado] = useState(false);
 
     // Nova consulta: volta para "Todas" e seleciona a primeira linha.
@@ -3183,6 +3354,13 @@ function ConsultaIssCnae({ data, listaNacional, searchTerm, setSearchTerm, mode,
         onSearch(searchTerm, mode);
     };
 
+    // Quantos resultados a última busca traria em cada pílula (só depois de buscar algo).
+    const contagemModos = useMemo(() => {
+        if (results === null || !lastQuery) return null;
+        return Object.fromEntries(SEARCH_MODES.map(m =>
+            [m.id, window.BuscaFiscal.filtrar(data, lastQuery, m.id, listaNacional).length]));
+    }, [data, lastQuery, listaNacional, results]);
+
     const trocarModo = (novo) => {
         setMode(novo);
         if (results !== null) onSearch(searchTerm, novo);
@@ -3246,9 +3424,17 @@ function ConsultaIssCnae({ data, listaNacional, searchTerm, setSearchTerm, mode,
                         <button type="submit" className="pc-btn pc-btn--primary" style={{ minHeight: '2.5rem' }}>Consultar</button>
                     </div>
                     <div className="pc-seg" role="group" aria-label="Pesquisar em">
-                        {SEARCH_MODES.map(m => (
-                            <button key={m.id} type="button" aria-pressed={mode === m.id} onClick={() => trocarModo(m.id)}>{m.label}</button>
-                        ))}
+                        {SEARCH_MODES.map(m => {
+                            const n = contagemModos?.[m.id];
+                            const rotulo = n == null ? m.label : `${m.label}: ${n} ${n === 1 ? 'resultado' : 'resultados'}`;
+                            return (
+                                <button key={m.id} type="button" aria-pressed={mode === m.id} onClick={() => trocarModo(m.id)}
+                                    className={n === 0 ? 'is-vazio' : undefined} aria-label={rotulo} title={rotulo}>
+                                    {m.label}
+                                    {n != null && <span className="pc-seg-n" aria-hidden="true">{n}</span>}
+                                </button>
+                            );
+                        })}
                     </div>
                 </form>
 
@@ -3293,6 +3479,12 @@ function ConsultaIssCnae({ data, listaNacional, searchTerm, setSearchTerm, mode,
                                         </button>
                                     ))}
                                 </>
+                            )}
+                            {listaNacional?.cnaeSimples && (
+                                <button type="button" className="pc-btn pc-btn--sm" onClick={() => setAjuda('cnae')}>
+                                    <PcIcon name="help" size={16} />
+                                    Legenda do Simples
+                                </button>
                             )}
                             <button type="button" className="pc-btn pc-btn--sm" onClick={exportarCSV} disabled={!visiveis.length}>
                                 <PcIcon name="download" size={16} />
@@ -3340,11 +3532,22 @@ function ConsultaIssCnae({ data, listaNacional, searchTerm, setSearchTerm, mode,
                                                             mas o subitem {soNacional.subitem} não consta na Resolução SEFAZGO nº 01/2021, então não há CNAE nem alíquota municipal cadastrados.
                                                         </span>
                                                     ) : (
-                                                        <span>
-                                                            {window.BuscaFiscal.codigoNbs(lastQuery) && mode !== 'all'
-                                                                ? 'A busca por NBS funciona no modo "Tudo".'
-                                                                : 'Tente um termo mais curto, o número do item da LC, o código nacional, a NBS ou o código CNAE.'}
-                                                        </span>
+                                                        (() => {
+                                                            // Pílula escolhida não combina com o tipo do termo: oferece a que tem resultado.
+                                                            const melhor = contagemModos && SEARCH_MODES
+                                                                .filter(m => m.id !== mode && contagemModos[m.id] > 0)
+                                                                .sort((a, b) => contagemModos[b.id] - contagemModos[a.id])[0];
+                                                            return melhor ? (
+                                                                <>
+                                                                    <span>Nada em “{SEARCH_MODES.find(m => m.id === mode)?.label}”, mas este termo tem resultados em outra pílula.</span>
+                                                                    <button type="button" className="pc-btn pc-btn--sm" onClick={() => trocarModo(melhor.id)}>
+                                                                        Ver {contagemModos[melhor.id]} em “{melhor.label}”
+                                                                    </button>
+                                                                </>
+                                                            ) : (
+                                                                <span>Tente um termo mais curto, o número do item da LC, o código nacional, a NBS ou o código CNAE.</span>
+                                                            );
+                                                        })()
                                                     )}
                                                 </div>
                                             );
@@ -3388,7 +3591,8 @@ function ConsultaIssCnae({ data, listaNacional, searchTerm, setSearchTerm, mode,
                                             if (s.situacao === 'nao-impeditivo') {
                                                 return (
                                                     <span style={{ ...nota, color: 'var(--pc-muted)' }}>
-                                                        Simples Nacional: CNAE não consta nos Anexos VI e VII da Res. CGSN nº 140/2018 (não impeditivo pela CNAE; as demais vedações do art. 17 da LC 123/2006 continuam valendo).
+                                                        Simples Nacional: CNAE não consta nos Anexos VI e VII da Res. CGSN nº 140/2018 (não impeditivo pela CNAE; as demais vedações do art. 17 da LC 123/2006 continuam valendo).{' '}
+                                                        <BotaoAjuda termo="nao-impeditivo" onAbrir={setAjuda} />
                                                     </span>
                                                 );
                                             }
@@ -3402,6 +3606,7 @@ function ConsultaIssCnae({ data, listaNacional, searchTerm, setSearchTerm, mode,
                                                             ? `Consta no Anexo VI da Res. CGSN nº 140/2018 (CNAEs impeditivos): "${s.denominacao}".`
                                                             : `Consta no Anexo VII da Res. CGSN nº 140/2018: o código abrange atividade impeditiva e permitida ("${s.denominacao}"). A opção depende da atividade efetivamente exercida.`}
                                                     </span>
+                                                    <BotaoAjuda termo={s.situacao} onAbrir={setAjuda} />
                                                 </div>
                                             );
                                         })()}
@@ -3435,7 +3640,10 @@ function ConsultaIssCnae({ data, listaNacional, searchTerm, setSearchTerm, mode,
                                     </div>
                                     {listaNacional?.simplesNacional && (
                                         <div className="flex flex-col gap-2">
-                                            <span className="pc-eyebrow">Simples Nacional (PGDAS-D)</span>
+                                            <div className="flex items-center justify-between gap-2">
+                                                <span className="pc-eyebrow">Simples Nacional (PGDAS-D)</span>
+                                                <BotaoAjuda termo={termoGlossarioSn(simplesDoAtual[0])} onAbrir={setAjuda} />
+                                            </div>
                                             {simplesDoAtual.length ? (
                                                 <>
                                                     {simplesDoAtual.map(a => (
@@ -3511,6 +3719,8 @@ function ConsultaIssCnae({ data, listaNacional, searchTerm, setSearchTerm, mode,
                     </section>
                 </>
             )}
+
+            {ajuda && <AjudaSimples foco={ajuda} onClose={() => setAjuda(null)} />}
 
             <footer className="pc-q-note">
                 <span>Base: Lei Complementar nº 001/2003 — Código Tributário Municipal</span>
