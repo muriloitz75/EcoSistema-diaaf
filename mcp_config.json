@@ -15,8 +15,14 @@
                             },
                             "limit": {
                                 "type": "integer",
-                                "description": "Número máximo de resultados",
+                                "description": "Número máximo de resultados (1 a 100)",
                                 "default": 10
+                            },
+                            "mode": {
+                                "type": "string",
+                                "enum": ["all", "text", "lc", "cnae"],
+                                "description": "Onde pesquisar: tudo, só descrições, só item da LC ou só CNAE",
+                                "default": "all"
                             }
                         },
                         "required": [
