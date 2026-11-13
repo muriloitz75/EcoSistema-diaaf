@@ -4333,29 +4333,6 @@ function App() {
                             </div>
 
                             <div className="pc-top-tools">
-                                {currentView === 'home' && (
-                                    <form
-                                        role="search"
-                                        className="pc-input pc-top-search"
-                                        onSubmit={(e) => {
-                                            e.preventDefault();
-                                            if (!searchTerm.trim()) return;
-                                            setCurrentView('search');
-                                            handleSearch();
-                                        }}
-                                    >
-                                        <label htmlFor="home-search" className="pc-sr-only">Consultar CNAE, item da LC ou atividade</label>
-                                        <PcIcon name="search" size={18} />
-                                        <input
-                                            id="home-search"
-                                            type="search"
-                                            value={searchTerm}
-                                            onChange={(e) => setSearchTerm(e.target.value)}
-                                            placeholder="Consultar CNAE, item da LC ou atividade"
-                                            style={{ fontSize: '.875rem' }}
-                                        />
-                                    </form>
-                                )}
                                 <a
                                     href="https://app.bbgov360.com.br/atendimento?id=8340618"
                                     target="_blank"
@@ -4363,7 +4340,7 @@ function App() {
                                     className="pc-iconbtn"
                                     aria-label="Atendimento Virtual"
                                 >
-                                    <img src="image/NextChat.png" alt="" />
+                                    <span className="pc-mask-icon" style={{ '--icon': 'url("image/NextChat.png")' }} aria-hidden="true" />
                                     <span className="pc-tip">Atendimento Virtual</span>
                                 </a>
                                 <a

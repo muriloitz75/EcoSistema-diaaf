@@ -140,6 +140,8 @@ body {
 }
 .pc-iconbtn:hover { border-color: var(--pc-line-strong); color: var(--pc-ink); }
 .pc-iconbtn img { width: 1.25rem; height: 1.25rem; object-fit: contain; }
+/* Ícone em imagem que segue a cor do texto (claro/escuro): a imagem vira máscara. */
+.pc-mask-icon { width: 1.25rem; height: 1.25rem; flex: none; background: currentColor; -webkit-mask: var(--icon) center / contain no-repeat; mask: var(--icon) center / contain no-repeat; }
 
 .pc-field { display: flex; flex-direction: column; gap: .5rem; }
 .pc-label { font-size: .875rem; font-weight: 500; color: var(--pc-ink-2); }
@@ -531,8 +533,7 @@ body {
 .pc-top-id { display: flex; align-items: center; gap: .75rem; min-width: 0; }
 .pc-top-date { margin: 0; font-size: .875rem; color: var(--pc-muted); }
 .pc-top-title { margin: .125rem 0 0; font-family: var(--pc-display); font-weight: 600; font-size: 1.875rem; letter-spacing: -0.02em; line-height: 1.15; }
-.pc-top-tools { display: flex; align-items: center; gap: .5rem; flex: 0 1 34rem; min-width: 0; }
-.pc-top-search { flex: 1; min-width: 0; min-height: 2.75rem; }
+.pc-top-tools { display: flex; align-items: center; gap: .5rem; flex: none; margin-left: auto; }
 .pc-crumbs { display: flex; flex-wrap: wrap; align-items: center; gap: .625rem; font-size: .875rem; color: var(--pc-muted); }
 .pc-crumbs button { background: none; border: 0; padding: 0; font: inherit; color: var(--pc-muted); cursor: pointer; }
 .pc-crumbs button:hover { color: var(--pc-ink); }
