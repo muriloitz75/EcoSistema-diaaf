@@ -1311,11 +1311,15 @@ app.post('/api/audit/log', authenticateToken, requireDB, async (req, res) => {
 
 // ================= ROTAS DE CONSULTA FISCAL =================
 
-// Base ISS / CNAE: a mesma dados.json que a tela "Consulta ISS / CNAE" usa.
+// Regras compartilhadas com a tela "Consulta ISS / CNAE" (mesmos arquivos que o index.html carrega):
+// busca-fiscal.js (como a busca casa os termos) e incidencia-iss.js (art. 3º da LC 116).
+const BuscaFiscal = require('./busca-fiscal');
+const { localDeIncidencia } = require('./incidencia-iss');
+
+// Base ISS / CNAE: a mesma dados.json que a tela usa.
 // Fica em memória e é relida sozinha quando o arquivo muda (compara a data de
 // modificação a cada busca, o que é barato). Se a nova versão tiver JSON inválido,
 // continua servindo a última versão válida e registra o erro no log.
-const CAMPO_ITEM_LC = 'Descrição item da lista da Lei Complementar nº 001/2003 - CTM';
 const CAMINHO_BASE_FISCAL = require('path').join(__dirname, 'dados.json');
 let baseFiscal = null;
 let baseFiscalMtime = 0;
@@ -1339,37 +1343,6 @@ const carregarBaseFiscal = () => {
     return baseFiscal;
 };
 
-// Mesmas regras de correspondência da busca do frontend (script.js, assertiveSearch).
-const normalizarTexto = (t) => String(t ?? '').trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
-const normalizarCodigoLc = (c) => c.includes('.')
-    ? c.split('.').map(p => p.replace(/^0+/, '') || '0').join('.')
-    : (c.replace(/^0+/, '') || '0');
-const soDigitosCnae = (c) => String(c ?? '').replace(/[\s\-\/.]/g, '');
-const ehCodigo = (t) => /^[\d\-\/\.]+$/.test(t.trim());
-
-const casaItemLc = (campo, termo) => {
-    const m = normalizarTexto(campo).match(/^([\d.\-\/]+)/);
-    if (!m) return false;
-    const codCampo = normalizarCodigoLc(m[1]);
-    const codTermo = normalizarCodigoLc(termo);
-    if (codCampo === codTermo) return true;
-    // "7." ou "7" → todos os subitens do item 7
-    const item = termo.endsWith('.') ? codTermo.slice(0, -1) : (!termo.includes('.') ? codTermo : null);
-    return item !== null && codCampo.startsWith(item + '.');
-};
-const casaCnae = (campo, termo) => soDigitosCnae(campo).startsWith(soDigitosCnae(termo));
-const casaDescricao = (campo, termo) => normalizarTexto(campo).includes(normalizarTexto(termo));
-
-const MODOS_BUSCA_FISCAL = ['all', 'text', 'lc', 'cnae'];
-const linhaCasa = (linha, termo, modo) => {
-    const codigo = ehCodigo(termo);
-    const porLc = (modo === 'all' || modo === 'lc') && codigo && casaItemLc(linha['LIST LC'], termo);
-    const porCnae = (modo === 'all' || modo === 'cnae') && codigo && casaCnae(linha['CNAE'], termo);
-    const porTexto = (modo === 'all' || modo === 'text') && !codigo &&
-        (casaDescricao(linha[CAMPO_ITEM_LC], termo) || casaDescricao(linha['Descrição do CNAE'], termo));
-    return porLc || porCnae || porTexto;
-};
-
 // Busca de itens ISS / CNAE (usada pela ferramenta MCP fiscal_search)
 // GET /api/fiscal/search?query=...&limit=10&mode=all|text|lc|cnae
 app.get('/api/fiscal/search', authenticateToken, (req, res) => {
@@ -1377,21 +1350,23 @@ app.get('/api/fiscal/search', authenticateToken, (req, res) => {
         const query = String(req.query.query ?? '').trim();
         if (!query) return res.status(400).json({ error: "Termo de busca é obrigatório" });
 
-        const mode = MODOS_BUSCA_FISCAL.includes(req.query.mode) ? req.query.mode : 'all';
+        const mode = BuscaFiscal.MODOS.includes(req.query.mode) ? req.query.mode : 'all';
         const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 10, 1), 100);
 
-        const encontrados = carregarBaseFiscal().filter(linha => linhaCasa(linha, query, mode));
+        const encontrados = BuscaFiscal.filtrar(carregarBaseFiscal(), query, mode);
+        const C = BuscaFiscal.CAMPOS;
 
         res.json({
             query,
             mode,
             total: encontrados.length,
             results: encontrados.slice(0, limit).map(l => ({
-                itemLc: l['LIST LC'],
-                descricaoItemLc: l[CAMPO_ITEM_LC],
-                cnae: l['CNAE'],
-                descricaoCnae: l['Descrição do CNAE'],
-                aliquota: l['Alíquota']
+                itemLc: l[C.itemLc],
+                descricaoItemLc: l[C.descricaoItemLc],
+                cnae: l[C.cnae],
+                descricaoCnae: l[C.descricaoCnae],
+                aliquota: l[C.aliquota],
+                localIncidencia: localDeIncidencia(l[C.itemLc])
             }))
         });
     } catch (error) {

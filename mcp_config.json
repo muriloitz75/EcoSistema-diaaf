@@ -5,7 +5,7 @@
             "tools": [
                 {
                     "name": "fiscal_search",
-                    "description": "Busca códigos ISS e CNAE no banco de dados fiscal. Permite encontrar descrições e códigos relacionados.",
+                    "description": "Busca códigos ISS e CNAE no banco de dados fiscal. Retorna item da LC, CNAE, descrições, alíquota e o local de incidência do ISS (art. 3º da LC 116/2003).",
                     "inputSchema": {
                         "type": "object",
                         "properties": {
