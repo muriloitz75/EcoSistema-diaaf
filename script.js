@@ -1823,6 +1823,7 @@ const PC_ICONS = {
     moon: <path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" />,
     sun: <><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" /></>,
     mail: <><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m3 7 9 6 9-6" /></>,
+    headset: <><circle cx="12" cy="9.5" r="3.5" /><path d="M5 12v-2a7 7 0 0 1 14 0v2" /><rect x="3.75" y="10" width="2.5" height="4" rx="1.25" /><rect x="17.75" y="10" width="2.5" height="4" rx="1.25" /><path d="M19 14c0 1.1-.9 2-2 2h-3" /><path d="M6 21v-.5A3.5 3.5 0 0 1 9.5 17h5a3.5 3.5 0 0 1 3.5 3.5v.5" /></>,
     back: <path d="M19 12H5M11 18l-6-6 6-6" />,
     chevron: <path d="m6 9 6 6 6-6" />,
     arrowOut: <path d="M7 17 17 7M8 7h9v9" />,
@@ -4628,7 +4629,7 @@ function App() {
                                     className="pc-iconbtn"
                                     aria-label="Atendimento Virtual"
                                 >
-                                    <span className="pc-mask-icon" style={{ '--icon': 'url("image/NextChat.png")' }} aria-hidden="true" />
+                                    <PcIcon name="headset" size={18} />
                                     <span className="pc-tip">Atendimento Virtual</span>
                                 </a>
                                 <a

@@ -160,9 +160,6 @@ body {
     transition: border-color .15s ease, color .15s ease;
 }
 .pc-iconbtn:hover { border-color: var(--pc-line-strong); color: var(--pc-ink); }
-.pc-iconbtn img { width: 1.25rem; height: 1.25rem; object-fit: contain; }
-/* Ícone em imagem que segue a cor do texto (claro/escuro): a imagem vira máscara. */
-.pc-mask-icon { width: 1.25rem; height: 1.25rem; flex: none; background: currentColor; -webkit-mask: var(--icon) center / contain no-repeat; mask: var(--icon) center / contain no-repeat; }
 
 .pc-field { display: flex; flex-direction: column; gap: .5rem; }
 .pc-label { font-size: .875rem; font-weight: 500; color: var(--pc-ink-2); }
